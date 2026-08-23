@@ -60,10 +60,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 $method = $_SERVER['REQUEST_METHOD'];
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
-// Remove base path if exists (adjust based on your hosting setup)
-$basePath = '/api';
-if (strpos($uri, $basePath) === 0) {
-    $uri = substr($uri, strlen($basePath));
+// Normalize API URI regardless of subfolder or subdomain (e.g. /client/api/... or /api/...)
+$apiPos = strpos($uri, '/api');
+if ($apiPos !== false) {
+    $uri = substr($uri, $apiPos + 4);
 }
 
 // Ensure URI starts with /

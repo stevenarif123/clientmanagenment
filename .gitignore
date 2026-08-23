@@ -1,0 +1,17 @@
+# Packages and build archives
+ClientHub-Ready-Upload.zip
+ClientHub-Ready-Upload/
+*.zip
+*.tar.gz
+
+# Uploads directory contents (keep .htaccess)
+uploads/*
+!uploads/.htaccess
+
+# Superpowers and local logs
+.superpowers/
+*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db

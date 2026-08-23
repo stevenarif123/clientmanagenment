@@ -1,0 +1,28 @@
+# =====================================================
+# Uploads Security - Disable Script Execution
+# =====================================================
+
+# Prevent executing PHP and other server-side scripts in the uploads directory
+<FilesMatch "(?i)\.(php|phtml|php3|php4|php5|php7|php8|phps|pht|phar|cgi|pl|sh|py|exe|bat|cmd)$">
+    <IfModule authz_core_module>
+        Require all denied
+    </IfModule>
+    <IfModule !authz_core_module>
+        Order deny,allow
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# Disable script engines if available
+<IfModule mod_php.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php7.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php8.c>
+    php_flag engine off
+</IfModule>
+
+# Disable directory browsing
+Options -Indexes

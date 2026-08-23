@@ -42,6 +42,37 @@ class AuthMiddleware {
 
 
     public function authenticate(): ?array {
+        // 1. Check for X-API-Key header (for AI Agents & MCP integration)
+        $apiKey = '';
+        if (function_exists('getallheaders')) {
+            $headers = getallheaders();
+            $apiKey = $headers['X-API-Key'] ?? $headers['x-api-key'] ?? '';
+        }
+        if (empty($apiKey) && function_exists('apache_request_headers')) {
+            $headers = apache_request_headers();
+            $apiKey = $headers['X-API-Key'] ?? $headers['x-api-key'] ?? '';
+        }
+        if (empty($apiKey)) {
+            $apiKey = $_SERVER['HTTP_X_API_KEY'] ?? $_SERVER['REDIRECT_HTTP_X_API_KEY'] ?? '';
+        }
+
+        if (!empty($apiKey)) {
+            $configKey = $this->db->getConfig('API_KEY');
+            if (!empty($configKey) && hash_equals($configKey, $apiKey)) {
+                $admin = $this->db->fetch("SELECT id, username, email FROM admins ORDER BY id ASC LIMIT 1");
+                if ($admin) {
+                    return [
+                        'admin_id' => (int)$admin['id'],
+                        'username' => $admin['username'],
+                        'email' => $admin['email'],
+                        'token' => 'api_key_session'
+                    ];
+                }
+            }
+            return null;
+        }
+
+        // 2. Check for Authorization Bearer Token (for browser SPA)
         $authHeader = '';
         if (function_exists('getallheaders')) {
             $headers = getallheaders();
@@ -60,13 +91,11 @@ class AuthMiddleware {
         }
 
         // Extract Bearer token
-        if (!preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
-            return null;
+        if (preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
+            return $this->validateToken(trim($matches[1]));
         }
 
-        $token = trim($matches[1]);
-        
-        return $this->validateToken($token);
+        return null;
     }
 
 

@@ -315,7 +315,8 @@
           }
 
           try {
-            const res = await axios.get('/api/portal/' + encodeURIComponent(token));
+            const apiBase = window.location.pathname.replace(/\/portal\.html$/i, '').replace(/\/+$/, '') + '/api';
+            const res = await axios.get(apiBase + '/portal/' + encodeURIComponent(token));
             this.data = res.data?.data;
             this.project = this.data?.project;
             this.progress = this.data?.progress || {};

@@ -141,10 +141,10 @@ function uploadFile(array $files, array $data, int $adminId): void {
         Response::error('Failed to save uploaded file', 500);
     }
     
-    // Generate URL (adjust based on your hosting setup)
+    // Generate URL (relative so it works seamlessly on any domain/host)
     $config = $db->getConfig();
     $baseUrl = rtrim($config['APP_URL'] ?? '', '/');
-    $fileUrl = $baseUrl . '/uploads/' . $subDir . '/' . $newFilename;
+    $fileUrl = ($baseUrl !== '' ? $baseUrl : '') . '/uploads/' . $subDir . '/' . $newFilename;
     
     // Save to database
     $fileId = $db->insert('file_uploads', [

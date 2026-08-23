@@ -2,10 +2,15 @@
  * Unified API Client for Client Management System
  */
 
-const API_BASE = '/api';
+// Dynamically resolve API base path based on current URL path (supports subdomains, subfolders, and root)
+const getApiBase = () => {
+  const path = window.location.pathname.replace(/\/index\.html$/i, '');
+  const dir = path.endsWith('/') ? path.slice(0, -1) : path;
+  return `${dir}/api`;
+};
 
 const apiClient = axios.create({
-  baseURL: API_BASE,
+  baseURL: getApiBase(),
   headers: {
     'Content-Type': 'application/json'
   }

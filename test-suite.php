@@ -38,7 +38,7 @@ $admin = $db->fetch("SELECT * FROM admins WHERE username = 'admin'");
 if (!$admin) {
     $adminId = $db->insert('admins', [
         'username' => 'admin',
-        'password_hash' => AuthMiddleware::hashPassword('admin123'),
+        'password_hash' => AuthMiddleware::hashPassword('Mantapfb1_'),
         'email' => 'admin@clienthub.com'
     ]);
 } else {

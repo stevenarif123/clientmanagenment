@@ -181,4 +181,28 @@ class Validator {
         }
         return $sanitized;
     }
+
+    /**
+     * Quick static validation helper
+     */
+    public static function validate(array $data, array $rules): array {
+        $validator = new self($data);
+        foreach ($rules as $field => $ruleStr) {
+            $rulesList = is_array($ruleStr) ? $ruleStr : explode('|', $ruleStr);
+            foreach ($rulesList as $r) {
+                if ($r === 'required') {
+                    $validator->required($field);
+                } elseif ($r === 'email') {
+                    $validator->email($field);
+                } elseif (strpos($r, 'min:') === 0) {
+                    $validator->minLength($field, (int)substr($r, 4));
+                } elseif (strpos($r, 'max:') === 0) {
+                    $validator->maxLength($field, (int)substr($r, 4));
+                } elseif ($r === 'numeric') {
+                    $validator->numeric($field);
+                }
+            }
+        }
+        return $validator->getErrors();
+    }
 }
