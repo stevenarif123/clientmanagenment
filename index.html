@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-50">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClientHub - Client & Project Management</title>
+  
+  <!-- Tailwind CSS CDN for utility rendering -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f8fafc',
+              100: '#f1f5f9',
+              900: '#0f172a'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Application Custom Styles -->
+  <link rel="stylesheet" href="assets/css/app.css">
+
+  <!-- Vue 3, Axios & Chart.js CDNs -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="h-full">
+  <div id="app" class="h-full">
+    <!-- Toast Notifications Container -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- Initial Bootstrapping Loader -->
+    <div v-if="appLoading" class="min-h-screen bg-slate-50 flex flex-col items-center justify-center">
+      <div class="spinner w-10 h-10 border-3"></div>
+      <p class="text-sm font-semibold text-slate-600 mt-4 tracking-tight">Initializing ClientHub...</p>
+    </div>
+
+    <!-- Guest Screens (Login, Setup, or Not Authenticated) -->
+    <template v-else-if="!auth.isAuthenticated || isGuestScreen">
+      <component :is="guestComponent" />
+    </template>
+
+    <!-- Authenticated App Shell -->
+    <template v-else>
+      <app-layout :current-route="currentRoute">
+        <component :is="currentComponent" v-bind="currentRouteProps" />
+      </app-layout>
+    </template>
+  </div>
+
+  <!-- Core Libraries & Data Stores -->
+  <script src="assets/js/utils.js"></script>
+  <script src="assets/js/api.js"></script>
+  <script src="assets/js/auth.js"></script>
+
+  <!-- Components -->
+  <script src="js/components/stats-card.js"></script>
+  <script src="js/components/modals.js"></script>
+  <script src="js/components/layout.js"></script>
+
+  <!-- Pages -->
+  <script src="js/pages/login.js"></script>
+  <script src="js/pages/dashboard.js"></script>
+  <script src="js/pages/clients.js"></script>
+  <script src="js/pages/projects.js"></script>
+  <script src="js/pages/submissions.js"></script>
+  <script src="js/pages/services.js"></script>
+  <script src="js/pages/reports.js"></script>
+
+  <!-- Application Bootstrap & Routing Logic -->
+  <script>
+    const { createApp } = Vue;
+
+    const app = createApp({
+      components: {
+        AppLayout: window.AppLayout
+      },
+      data() {
+        return {
+          appLoading: true,
+          auth: window.Auth,
+          currentRoute: window.location.hash || '#/',
+          currentRouteProps: {}
+        };
+      },
+      computed: {
+        isGuestScreen() {
+          const route = this.currentRoute;
+          return route === '#/login' || route === '#/setup';
+        },
+        guestComponent() {
+          if (this.currentRoute === '#/setup' || window.Auth.needsSetup) {
+            return window.SetupView;
+          }
+          return window.LoginView;
+        },
+        currentComponent() {
+          const rawHash = this.currentRoute || '#/';
+          const hash = rawHash.split('?')[0];
+
+          if (hash === '#/login') return window.LoginView;
+          if (hash === '#/setup') return window.SetupView;
+          if (hash === '#/' || hash === '' || hash === '#') return window.DashboardView;
+          
+          // Clients Routes
+          if (hash === '#/clients') return window.ClientsView;
+          if (hash === '#/clients/new') {
+            this.currentRouteProps = { id: null };
+            return window.ClientFormView;
+          }
+          const clientEditMatch = hash.match(/^#\/clients\/(\d+)\/edit$/);
+          if (clientEditMatch) {
+            this.currentRouteProps = { id: parseInt(clientEditMatch[1]) };
+            return window.ClientFormView;
+          }
+          const clientDetailMatch = hash.match(/^#\/clients\/(\d+)$/);
+          if (clientDetailMatch) {
+            this.currentRouteProps = { id: parseInt(clientDetailMatch[1]) };
+            return window.ClientDetailView;
+          }
+
+          // Projects Routes
+          if (hash === '#/projects') return window.ProjectsView;
+          if (hash === '#/projects/new') {
+            this.currentRouteProps = { id: null };
+            return window.ProjectFormView;
+          }
+          const projectEditMatch = hash.match(/^#\/projects\/(\d+)\/edit$/);
+          if (projectEditMatch) {
+            this.currentRouteProps = { id: parseInt(projectEditMatch[1]) };
+            return window.ProjectFormView;
+          }
+          const projectDetailMatch = hash.match(/^#\/projects\/(\d+)$/);
+          if (projectDetailMatch) {
+            this.currentRouteProps = { id: parseInt(projectDetailMatch[1]) };
+            return window.ProjectDetailView;
+          }
+
+          // Other Routes
+          if (hash === '#/submissions') return window.SubmissionsView;
+          if (hash === '#/services') return window.ServicesView;
+          if (hash === '#/reports') return window.ReportsView;
+
+          return window.DashboardView;
+        }
+
+
+      },
+      async mounted() {
+        // Listen to URL hash change events
+        window.addEventListener('hashchange', () => {
+          this.currentRoute = window.location.hash || '#/';
+          this.routeGuard();
+        });
+
+        // Initialize and verify authentication
+        await this.initApp();
+      },
+      methods: {
+        async initApp() {
+          this.appLoading = true;
+
+          // 1. Check if initial setup is required
+          const needsSetup = await window.Auth.checkSetup();
+          if (needsSetup) {
+            this.currentRoute = '#/setup';
+            window.location.hash = '#/setup';
+            this.appLoading = false;
+            return;
+          }
+
+          // 2. Check active auth session
+          if (window.Auth.token) {
+            await window.Auth.checkAuth();
+          }
+
+          // 3. Sync route based on auth status
+          if (!window.Auth.isAuthenticated) {
+            this.currentRoute = '#/login';
+            if (window.location.hash !== '#/login') {
+              window.location.hash = '#/login';
+            }
+          } else {
+            this.currentRoute = window.location.hash || '#/';
+            if (this.currentRoute === '#/login' || this.currentRoute === '#/setup') {
+              this.currentRoute = '#/';
+              window.location.hash = '#/';
+            }
+          }
+
+          this.appLoading = false;
+        },
+        routeGuard() {
+          const hash = this.currentRoute;
+
+          // If setup is needed, force setup
+          if (window.Auth.needsSetup) {
+            if (hash !== '#/setup') {
+              this.currentRoute = '#/setup';
+              window.location.hash = '#/setup';
+            }
+            return;
+          }
+
+          // If not authenticated and not on login/setup, redirect to login
+          if (!window.Auth.isAuthenticated) {
+            if (hash !== '#/login' && hash !== '#/setup') {
+              this.currentRoute = '#/login';
+              window.location.hash = '#/login';
+            }
+            return;
+          }
+
+          // If authenticated and on login/setup, redirect to dashboard
+          if (window.Auth.isAuthenticated && (hash === '#/login' || hash === '#/setup')) {
+            this.currentRoute = '#/';
+            window.location.hash = '#/';
+            return;
+          }
+        }
+      }
+    });
+
+    app.mount('#app');
+  </script>
+</body>
+</html>

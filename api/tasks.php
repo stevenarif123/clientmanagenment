@@ -1,0 +1,182 @@
+<?php
+/**
+ * Project Tasks & Milestones API
+ */
+
+require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../utils/response.php';
+require_once __DIR__ . '/../utils/validator.php';
+
+/**
+ * Get all tasks for a project with progress statistics
+ */
+function getProjectTasks(int $projectId): void {
+    $db = Database::getInstance();
+
+    // Verify project exists
+    $project = $db->fetch("SELECT id, title FROM projects WHERE id = ?", [$projectId]);
+    if (!$project) {
+        Response::notFound('Project not found');
+    }
+
+    $tasks = $db->fetchAll(
+        "SELECT * FROM project_tasks 
+         WHERE project_id = ? 
+         ORDER BY 
+           CASE status 
+             WHEN 'In Progress' THEN 1 
+             WHEN 'Todo' THEN 2 
+             WHEN 'Completed' THEN 3 
+             ELSE 4 
+           END,
+           due_date ASC, 
+           id ASC",
+        [$projectId]
+    );
+
+    $total = count($tasks);
+    $completed = 0;
+    $inProgress = 0;
+    $todo = 0;
+
+    foreach ($tasks as $t) {
+        if ($t['status'] === 'Completed') $completed++;
+        else if ($t['status'] === 'In Progress') $inProgress++;
+        else $todo++;
+    }
+
+    $progressPercent = $total > 0 ? (int)round(($completed / $total) * 100) : 0;
+
+    Response::success([
+        'tasks' => $tasks,
+        'stats' => [
+            'total' => $total,
+            'completed' => $completed,
+            'in_progress' => $inProgress,
+            'todo' => $todo,
+            'progress_percent' => $progressPercent
+        ]
+    ]);
+}
+
+/**
+ * Create a new task for a project
+ */
+function createProjectTask(int $projectId): void {
+    $db = Database::getInstance();
+
+    // Verify project exists
+    $project = $db->fetch("SELECT id FROM projects WHERE id = ?", [$projectId]);
+    if (!$project) {
+        Response::notFound('Project not found');
+    }
+
+    $body = json_decode(file_get_contents('php://input'), true) ?? [];
+
+    $errors = Validator::validate($body, [
+        'title' => 'required'
+    ]);
+
+    if (!empty($errors)) {
+        Response::validationError($errors);
+    }
+
+    $status = in_array($body['status'] ?? '', ['Todo', 'In Progress', 'Completed']) ? $body['status'] : 'Todo';
+    $priority = in_array($body['priority'] ?? '', ['Low', 'Medium', 'High']) ? $body['priority'] : 'Medium';
+    $completedAt = $status === 'Completed' ? date('Y-m-d H:i:s') : null;
+
+    $taskId = $db->insert('project_tasks', [
+        'project_id' => $projectId,
+        'title' => Validator::sanitize($body['title']),
+        'description' => isset($body['description']) ? Validator::sanitize($body['description']) : null,
+        'status' => $status,
+        'priority' => $priority,
+        'due_date' => !empty($body['due_date']) ? Validator::sanitize($body['due_date']) : null,
+        'completed_at' => $completedAt
+    ]);
+
+    $task = $db->fetch("SELECT * FROM project_tasks WHERE id = ?", [$taskId]);
+
+    Response::success($task, 'Task created successfully', 201);
+}
+
+/**
+ * Update an existing task
+ */
+function updateTask(int $id): void {
+    $db = Database::getInstance();
+
+    $existing = $db->fetch("SELECT * FROM project_tasks WHERE id = ?", [$id]);
+    if (!$existing) {
+        Response::notFound('Task not found');
+    }
+
+    $body = json_decode(file_get_contents('php://input'), true) ?? [];
+
+    $updateData = [];
+    if (isset($body['title'])) {
+        $updateData['title'] = Validator::sanitize($body['title']);
+    }
+    if (array_key_exists('description', $body)) {
+        $updateData['description'] = !empty($body['description']) ? Validator::sanitize($body['description']) : null;
+    }
+    if (isset($body['priority']) && in_array($body['priority'], ['Low', 'Medium', 'High'])) {
+        $updateData['priority'] = $body['priority'];
+    }
+    if (array_key_exists('due_date', $body)) {
+        $updateData['due_date'] = !empty($body['due_date']) ? Validator::sanitize($body['due_date']) : null;
+    }
+    if (isset($body['status']) && in_array($body['status'], ['Todo', 'In Progress', 'Completed'])) {
+        $updateData['status'] = $body['status'];
+        $updateData['completed_at'] = $body['status'] === 'Completed' ? date('Y-m-d H:i:s') : null;
+    }
+
+    $updateData['updated_at'] = date('Y-m-d H:i:s');
+
+    $db->update('project_tasks', $updateData, 'id = ?', [$id]);
+
+    $task = $db->fetch("SELECT * FROM project_tasks WHERE id = ?", [$id]);
+
+    Response::success($task, 'Task updated successfully');
+}
+
+/**
+ * Toggle task status (Todo/In Progress <-> Completed)
+ */
+function toggleTaskStatus(int $id): void {
+    $db = Database::getInstance();
+
+    $task = $db->fetch("SELECT * FROM project_tasks WHERE id = ?", [$id]);
+    if (!$task) {
+        Response::notFound('Task not found');
+    }
+
+    $newStatus = $task['status'] === 'Completed' ? 'Todo' : 'Completed';
+    $completedAt = $newStatus === 'Completed' ? date('Y-m-d H:i:s') : null;
+
+    $db->update('project_tasks', [
+        'status' => $newStatus,
+        'completed_at' => $completedAt,
+        'updated_at' => date('Y-m-d H:i:s')
+    ], 'id = ?', [$id]);
+
+    $updated = $db->fetch("SELECT * FROM project_tasks WHERE id = ?", [$id]);
+
+    Response::success($updated, 'Task status updated');
+}
+
+/**
+ * Delete a task
+ */
+function deleteTask(int $id): void {
+    $db = Database::getInstance();
+
+    $task = $db->fetch("SELECT id FROM project_tasks WHERE id = ?", [$id]);
+    if (!$task) {
+        Response::notFound('Task not found');
+    }
+
+    $db->delete('project_tasks', 'id = ?', [$id]);
+
+    Response::success(null, 'Task deleted successfully');
+}

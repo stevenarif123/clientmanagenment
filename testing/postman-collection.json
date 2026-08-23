@@ -1,0 +1,977 @@
+{
+	"info": {
+		"_postman_id": "client-management-api",
+		"name": "Client Management API",
+		"description": "API collection for Client Management System",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8000/api",
+			"type": "string"
+		},
+		{
+			"key": "token",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{token}}",
+				"type": "string"
+			}
+		]
+	},
+	"item": [
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Check Setup Status",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/auth/check-setup",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "check-setup"]
+						},
+						"description": "Check if initial admin setup is needed"
+					}
+				},
+				{
+					"name": "Initial Setup",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"username\": \"admin\",\n    \"password\": \"password123\",\n    \"email\": \"admin@example.com\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/setup",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "setup"]
+						},
+						"description": "Create first admin account (only works if no admin exists)"
+					}
+				},
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData.success && jsonData.data.token) {",
+									"    pm.collectionVariables.set('token', jsonData.data.token);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"username\": \"admin\",\n    \"password\": \"password123\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/login",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "login"]
+						},
+						"description": "Login and get session token (auto-saved to collection variable)"
+					}
+				},
+				{
+					"name": "Verify Session",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/auth/verify",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "verify"]
+						},
+						"description": "Verify current session is valid"
+					}
+				},
+				{
+					"name": "Logout",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/auth/logout",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "logout"]
+						},
+						"description": "Logout and invalidate session"
+					}
+				}
+			]
+		},
+		{
+			"name": "Clients",
+			"item": [
+				{
+					"name": "List Clients",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/clients?page=1&limit=20",
+							"host": ["{{baseUrl}}"],
+							"path": ["clients"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "search",
+									"value": "",
+									"disabled": true
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Client",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/clients/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["clients", "1"]
+						}
+					}
+				},
+				{
+					"name": "Create Client",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"John Doe\",\n    \"email\": \"john@example.com\",\n    \"phone\": \"+62812345678\",\n    \"company\": \"Acme Inc\",\n    \"address\": \"Jakarta, Indonesia\",\n    \"notes\": \"VIP client\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/clients",
+							"host": ["{{baseUrl}}"],
+							"path": ["clients"]
+						}
+					}
+				},
+				{
+					"name": "Update Client",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"John Doe Updated\",\n    \"email\": \"john.updated@example.com\",\n    \"phone\": \"+62812345679\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/clients/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["clients", "1"]
+						}
+					}
+				},
+				{
+					"name": "Delete Client",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/clients/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["clients", "1"]
+						}
+					}
+				},
+				{
+					"name": "Get Client Communications",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/clients/1/communications",
+							"host": ["{{baseUrl}}"],
+							"path": ["clients", "1", "communications"]
+						}
+					}
+				},
+				{
+					"name": "Get Client Files",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/clients/1/files",
+							"host": ["{{baseUrl}}"],
+							"path": ["clients", "1", "files"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Projects",
+			"item": [
+				{
+					"name": "List Projects",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/projects?page=1&limit=20",
+							"host": ["{{baseUrl}}"],
+							"path": ["projects"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "client_id",
+									"value": "",
+									"disabled": true
+								},
+								{
+									"key": "status",
+									"value": "",
+									"disabled": true
+								},
+								{
+									"key": "search",
+									"value": "",
+									"disabled": true
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Project",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/projects/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["projects", "1"]
+						}
+					}
+				},
+				{
+					"name": "Create Project",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"client_id\": 1,\n    \"title\": \"Company Website\",\n    \"description\": \"Full website redesign\",\n    \"status\": \"Pending\",\n    \"budget\": 15000000,\n    \"start_date\": \"2025-01-15\",\n    \"deadline\": \"2025-03-15\",\n    \"service_ids\": [1, 2]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/projects",
+							"host": ["{{baseUrl}}"],
+							"path": ["projects"]
+						}
+					}
+				},
+				{
+					"name": "Update Project",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"title\": \"Company Website - Updated\",\n    \"status\": \"In Progress\",\n    \"budget\": 18000000\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/projects/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["projects", "1"]
+						}
+					}
+				},
+				{
+					"name": "Delete Project",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/projects/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["projects", "1"]
+						}
+					}
+				},
+				{
+					"name": "Get Budget Summary",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/projects/1/budget-summary",
+							"host": ["{{baseUrl}}"],
+							"path": ["projects", "1", "budget-summary"]
+						}
+					}
+				},
+				{
+					"name": "Get Project Files",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/projects/1/files",
+							"host": ["{{baseUrl}}"],
+							"path": ["projects", "1", "files"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Expenses",
+			"item": [
+				{
+					"name": "List Project Expenses",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/projects/1/expenses",
+							"host": ["{{baseUrl}}"],
+							"path": ["projects", "1", "expenses"]
+						}
+					}
+				},
+				{
+					"name": "Create Expense",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"description\": \"Domain registration\",\n    \"amount\": 150000,\n    \"category\": \"Hosting\",\n    \"expense_date\": \"2025-01-15\",\n    \"notes\": \"1 year renewal\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/projects/1/expenses",
+							"host": ["{{baseUrl}}"],
+							"path": ["projects", "1", "expenses"]
+						}
+					}
+				},
+				{
+					"name": "Update Expense",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"description\": \"Domain registration - 2 years\",\n    \"amount\": 280000\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/expenses/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["expenses", "1"]
+						}
+					}
+				},
+				{
+					"name": "Delete Expense",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/expenses/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["expenses", "1"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Payments",
+			"item": [
+				{
+					"name": "List Project Payments",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/projects/1/payments",
+							"host": ["{{baseUrl}}"],
+							"path": ["projects", "1", "payments"]
+						}
+					}
+				},
+				{
+					"name": "Create Payment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"amount\": 7500000,\n    \"payment_method\": \"Bank Transfer\",\n    \"payment_date\": \"2025-01-10\",\n    \"status\": \"Received\",\n    \"notes\": \"50% down payment\",\n    \"reference_number\": \"TRX-001\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/projects/1/payments",
+							"host": ["{{baseUrl}}"],
+							"path": ["projects", "1", "payments"]
+						}
+					}
+				},
+				{
+					"name": "Update Payment",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"status\": \"Received\",\n    \"notes\": \"Payment confirmed\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/payments/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["payments", "1"]
+						}
+					}
+				},
+				{
+					"name": "Delete Payment",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/payments/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["payments", "1"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Communications",
+			"item": [
+				{
+					"name": "List Project Communications",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/projects/1/communications",
+							"host": ["{{baseUrl}}"],
+							"path": ["projects", "1", "communications"]
+						}
+					}
+				},
+				{
+					"name": "Create Communication",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"type\": \"email\",\n    \"subject\": \"Project Kickoff\",\n    \"content\": \"Dear client, we are excited to start working on your project...\",\n    \"communication_date\": \"2025-01-15T10:30:00Z\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/projects/1/communications",
+							"host": ["{{baseUrl}}"],
+							"path": ["projects", "1", "communications"]
+						}
+					}
+				},
+				{
+					"name": "Create WhatsApp Log",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"type\": \"whatsapp\",\n    \"subject\": \"Progress Update\",\n    \"content\": \"Discussed design mockups with client\",\n    \"communication_date\": \"2025-01-16T14:00:00Z\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/projects/1/communications",
+							"host": ["{{baseUrl}}"],
+							"path": ["projects", "1", "communications"]
+						}
+					}
+				},
+				{
+					"name": "Create Note",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"type\": \"note\",\n    \"subject\": \"Internal Note\",\n    \"content\": \"Client prefers blue color scheme\",\n    \"communication_date\": \"2025-01-16T15:00:00Z\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/projects/1/communications",
+							"host": ["{{baseUrl}}"],
+							"path": ["projects", "1", "communications"]
+						}
+					}
+				},
+				{
+					"name": "Delete Communication",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/communications/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["communications", "1"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Services",
+			"item": [
+				{
+					"name": "List Services",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/services",
+							"host": ["{{baseUrl}}"],
+							"path": ["services"]
+						}
+					}
+				},
+				{
+					"name": "Create Service",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Web Development\",\n    \"description\": \"Custom website development\",\n    \"base_price\": 5000000\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/services",
+							"host": ["{{baseUrl}}"],
+							"path": ["services"]
+						}
+					}
+				},
+				{
+					"name": "Update Service",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Web Development Pro\",\n    \"base_price\": 7500000\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/services/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["services", "1"]
+						}
+					}
+				},
+				{
+					"name": "Delete Service",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/services/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["services", "1"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Submissions",
+			"item": [
+				{
+					"name": "List Submissions",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/submissions?page=1&limit=20",
+							"host": ["{{baseUrl}}"],
+							"path": ["submissions"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "status",
+									"value": "",
+									"disabled": true
+								},
+								{
+									"key": "search",
+									"value": "",
+									"disabled": true
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Create Submission (Public)",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Jane Smith\",\n    \"email\": \"jane@example.com\",\n    \"phone\": \"+62812345678\",\n    \"company\": \"Tech Corp\",\n    \"service\": \"Web Development\",\n    \"message\": \"I need a website for my business. Please contact me.\",\n    \"source\": \"website\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/submissions",
+							"host": ["{{baseUrl}}"],
+							"path": ["submissions"]
+						},
+						"description": "Public endpoint - no authentication required. Use this for website contact forms."
+					}
+				},
+				{
+					"name": "Get Submission",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/submissions/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["submissions", "1"]
+						}
+					}
+				},
+				{
+					"name": "Update Submission",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"status\": \"Reviewed\",\n    \"is_duplicate\": false\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/submissions/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["submissions", "1"]
+						}
+					}
+				},
+				{
+					"name": "Convert to Client",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"create_project\": true,\n    \"project_title\": \"Website for Tech Corp\",\n    \"project_budget\": 10000000\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/submissions/1/convert",
+							"host": ["{{baseUrl}}"],
+							"path": ["submissions", "1", "convert"]
+						}
+					}
+				},
+				{
+					"name": "Get Potential Duplicates",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/submissions/1/duplicates",
+							"host": ["{{baseUrl}}"],
+							"path": ["submissions", "1", "duplicates"]
+						}
+					}
+				},
+				{
+					"name": "Delete Submission",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/submissions/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["submissions", "1"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Files",
+			"item": [
+				{
+					"name": "Upload File",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"src": ""
+								},
+								{
+									"key": "project_id",
+									"value": "1",
+									"type": "text"
+								},
+								{
+									"key": "description",
+									"value": "Project design mockup",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/files/upload",
+							"host": ["{{baseUrl}}"],
+							"path": ["files", "upload"]
+						},
+						"description": "Max file size: 5MB. Allowed: jpg, jpeg, png, gif, webp, pdf, doc, docx, xls, xlsx, zip, rar, txt"
+					}
+				},
+				{
+					"name": "Delete File",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/files/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["files", "1"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Reports",
+			"item": [
+				{
+					"name": "Dashboard Stats",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/reports/dashboard",
+							"host": ["{{baseUrl}}"],
+							"path": ["reports", "dashboard"]
+						}
+					}
+				},
+				{
+					"name": "Budget Overview",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/reports/budget-overview",
+							"host": ["{{baseUrl}}"],
+							"path": ["reports", "budget-overview"],
+							"query": [
+								{
+									"key": "start_date",
+									"value": "",
+									"disabled": true
+								},
+								{
+									"key": "end_date",
+									"value": "",
+									"disabled": true
+								},
+								{
+									"key": "client_id",
+									"value": "",
+									"disabled": true
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Export Clients (CSV)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/reports/export/clients",
+							"host": ["{{baseUrl}}"],
+							"path": ["reports", "export", "clients"]
+						}
+					}
+				},
+				{
+					"name": "Export Projects (CSV)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/reports/export/projects",
+							"host": ["{{baseUrl}}"],
+							"path": ["reports", "export", "projects"],
+							"query": [
+								{
+									"key": "status",
+									"value": "",
+									"disabled": true
+								},
+								{
+									"key": "client_id",
+									"value": "",
+									"disabled": true
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Export Project Detail (CSV)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/reports/export/project/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["reports", "export", "project", "1"]
+						}
+					}
+				}
+			]
+		}
+	]
+}

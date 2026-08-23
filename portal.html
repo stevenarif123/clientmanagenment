@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-50">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Client Portal - Project Progress & Deliverables</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Vue 3 & Axios CDNs -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+  <style>
+    [v-cloak] { display: none; }
+    .spinner {
+      border: 2px solid rgba(226, 232, 240, 0.8);
+      border-top-color: #0f172a;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body class="h-full text-slate-800 antialiased selection:bg-slate-900 selection:text-white">
+  <div id="portal-app" v-cloak class="min-h-full flex flex-col justify-between">
+    
+    <!-- Top Branding Navbar -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+      <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-sm shadow">
+            CP
+          </div>
+          <div>
+            <span class="font-bold text-slate-900 text-base tracking-tight block">ClientHub Portal</span>
+            <span class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Live Project Tracking</span>
+          </div>
+        </div>
+
+        <div v-if="project" class="flex items-center gap-2">
+          <span class="text-xs font-semibold px-3 py-1 rounded-full border" :class="getStatusBadgeClass(project.status)">
+            {{ project.status }}
+          </span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 py-8 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto w-full">
+      
+      <!-- Loading State -->
+      <div v-if="loading" class="py-24 text-center">
+        <div class="spinner w-10 h-10 mx-auto mb-4"></div>
+        <p class="text-sm font-semibold text-slate-600">Loading your project status...</p>
+        <p class="text-xs text-slate-400 mt-1">Retrieving tasks, deliverables, and progress timeline.</p>
+      </div>
+
+      <!-- Error State -->
+      <div v-else-if="error" class="bg-white rounded-2xl border border-rose-200 p-8 sm:p-12 text-center shadow-sm max-w-lg mx-auto my-12">
+        <div class="w-14 h-14 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto mb-4">
+          <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        </div>
+        <h2 class="text-xl font-bold text-slate-900">Portal Link Unavailable</h2>
+        <p class="text-sm text-slate-600 mt-2 leading-relaxed">{{ error }}</p>
+        <p class="text-xs text-slate-400 mt-4">Please contact your project manager or agency administrator for an updated link.</p>
+      </div>
+
+      <!-- Loaded Portal Dashboard -->
+      <div v-else-if="data" class="space-y-8">
+        
+        <!-- Welcome & Project Hero Card -->
+        <div class="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-sm">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div>
+              <p class="text-xs font-bold uppercase tracking-wider text-slate-400">
+                Prepared for: <span class="text-slate-800">{{ project.client_name }}</span>
+                <span v-if="project.client_company"> ({{ project.client_company }})</span>
+              </p>
+              <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1 tracking-tight">{{ project.title }}</h1>
+              <p class="text-sm font-medium text-slate-500 mt-1">{{ project.service_name }}</p>
+            </div>
+
+            <!-- Overall Progress Circular Badge -->
+            <div class="flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200/80 shrink-0">
+              <div class="text-right">
+                <span class="text-[10px] font-bold uppercase text-slate-400 tracking-wider block">Execution</span>
+                <span class="text-2xl font-black text-slate-900 tabular-nums">{{ progress.work_percent }}%</span>
+              </div>
+              <div class="w-12 h-12 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm">
+                {{ progress.completed_tasks }}/{{ progress.total_tasks }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Description if exists -->
+          <p v-if="project.description" class="mt-5 text-sm text-slate-600 leading-relaxed bg-slate-50/50 p-4 rounded-xl border border-slate-100">
+            {{ project.description }}
+          </p>
+
+          <!-- Timeline Dates Bar -->
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-6 pt-6 border-t border-slate-100 text-xs">
+            <div>
+              <span class="text-slate-400 font-semibold block uppercase text-[10px]">Start Date</span>
+              <span class="text-slate-800 font-bold mt-0.5 block">{{ formatDate(project.start_date) }}</span>
+            </div>
+            <div>
+              <span class="text-slate-400 font-semibold block uppercase text-[10px]">Target Completion</span>
+              <span class="text-slate-800 font-bold mt-0.5 block">{{ formatDate(project.end_date) }}</span>
+            </div>
+            <div class="col-span-2 sm:col-span-1">
+              <span class="text-slate-400 font-semibold block uppercase text-[10px]">Payment Status</span>
+              <span class="text-emerald-700 font-bold mt-0.5 block">{{ billing.payment_percent }}% Settled</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 1: Work Milestones & Tasks -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 class="text-lg font-bold text-slate-900">Work Milestones & Deliverable Tasks</h2>
+              <p class="text-xs text-slate-500 mt-0.5">Real-time status of items being developed, tested, and delivered</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold px-2.5 py-1 bg-blue-50 text-blue-700 rounded-lg border border-blue-200">
+                {{ progress.completed_tasks }} of {{ progress.total_tasks }} Completed
+              </span>
+            </div>
+          </div>
+
+          <!-- Progress Bar -->
+          <div class="w-full bg-slate-100 h-2">
+            <div
+              class="h-full bg-blue-600 transition-all duration-500"
+              :style="{ width: progress.work_percent + '%' }"
+            ></div>
+          </div>
+
+          <!-- Tasks List -->
+          <div class="divide-y divide-slate-100">
+            <div v-if="!progress.tasks || progress.tasks.length === 0" class="p-12 text-center text-sm text-slate-400">
+              No milestone tasks published yet.
+            </div>
+            <div
+              v-for="t in progress.tasks"
+              :key="t.id"
+              class="p-5 flex items-start justify-between gap-4"
+            >
+              <div class="flex items-start gap-3.5 min-w-0">
+                <!-- Status Icon -->
+                <div
+                  :class="['w-6 h-6 mt-0.5 rounded-full flex items-center justify-center shrink-0', t.status === 'Completed' ? 'bg-emerald-100 text-emerald-600' : t.status === 'In Progress' ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-400']"
+                >
+                  <svg v-if="t.status === 'Completed'" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                  <span v-else-if="t.status === 'In Progress'" class="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
+                  <span v-else class="w-2 h-2 rounded-full bg-slate-300"></span>
+                </div>
+
+                <div class="min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span :class="['text-sm font-semibold', t.status === 'Completed' ? 'line-through text-slate-400' : 'text-slate-900']">
+                      {{ t.title }}
+                    </span>
+                    <span
+                      class="text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase"
+                      :class="t.status === 'Completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : t.status === 'In Progress' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-slate-100 text-slate-600 border-slate-200'"
+                    >
+                      {{ t.status }}
+                    </span>
+                  </div>
+
+                  <p v-if="t.description" class="text-xs text-slate-600 mt-1 leading-relaxed">{{ t.description }}</p>
+                  <p v-if="t.due_date" class="text-[11px] text-slate-400 mt-1.5">
+                    Target: {{ formatDate(t.due_date) }}
+                  </p>
+                </div>
+              </div>
+
+              <span v-if="t.completed_at" class="text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md shrink-0 border border-emerald-100">
+                Done {{ formatDate(t.completed_at) }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Deliverables & Files Download -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="p-6 border-b border-slate-100">
+            <h2 class="text-lg font-bold text-slate-900">Deliverables & Project Files</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Download design assets, documents, reports, and project outputs</p>
+          </div>
+
+          <div class="divide-y divide-slate-100">
+            <div v-if="!files || files.length === 0" class="p-10 text-center text-sm text-slate-400">
+              No files or deliverables attached yet.
+            </div>
+            <div
+              v-for="f in files"
+              :key="f.id"
+              class="p-4 sm:p-5 flex items-center justify-between hover:bg-slate-50 transition-colors"
+            >
+              <div class="flex items-center gap-3 min-w-0">
+                <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 border border-slate-200">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                </div>
+                <div class="min-w-0">
+                  <a :href="f.file_url" target="_blank" class="font-semibold text-slate-900 hover:underline text-sm truncate block">{{ f.original_name }}</a>
+                  <p class="text-xs text-slate-400 mt-0.5">{{ formatFileSize(f.file_size) }} &bull; Uploaded {{ formatDate(f.uploaded_at) }}</p>
+                </div>
+              </div>
+
+              <a
+                :href="f.file_url"
+                target="_blank"
+                download
+                class="px-4 py-2 text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-lg shadow-sm transition-colors flex items-center gap-1.5 shrink-0"
+              >
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                Download
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 3: Billing & Invoicing Summary -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
+          <div class="mb-6">
+            <h2 class="text-lg font-bold text-slate-900">Billing & Payment Summary</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Summary of contracted budget, payments received, and remaining balance</p>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
+            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200/80">
+              <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Total Contract Value</span>
+              <p class="text-xl font-bold text-slate-900 tabular-nums mt-1">{{ formatCurrency(billing.total_budget) }}</p>
+            </div>
+            <div class="p-4 rounded-xl bg-emerald-50/75 border border-emerald-200/80">
+              <span class="text-[10px] uppercase font-bold text-emerald-700 tracking-wider">Amount Paid</span>
+              <p class="text-xl font-bold text-emerald-800 tabular-nums mt-1">{{ formatCurrency(billing.total_received) }}</p>
+            </div>
+            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200/80">
+              <span class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Remaining Balance</span>
+              <p class="text-xl font-bold text-slate-900 tabular-nums mt-1">{{ formatCurrency(billing.remaining_balance) }}</p>
+            </div>
+          </div>
+
+          <!-- Payments Recorded -->
+          <div v-if="billing.payments && billing.payments.length > 0" class="mt-6 pt-6 border-t border-slate-100">
+            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Receipts & Transactions</h4>
+            <div class="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
+              <div
+                v-for="(pay, idx) in billing.payments"
+                :key="idx"
+                class="p-3.5 bg-white flex items-center justify-between text-xs"
+              >
+                <div>
+                  <span class="font-bold text-slate-900">{{ formatCurrency(pay.amount) }}</span>
+                  <span class="text-slate-500 ml-2">&bull; {{ pay.payment_method || 'Payment' }}</span>
+                </div>
+                <div class="flex items-center gap-3">
+                  <span class="text-slate-400">{{ formatDate(pay.payment_date) }}</span>
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                    {{ pay.status }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-400">
+      <div class="max-w-5xl mx-auto px-4">
+        Powered by <strong class="text-slate-700 font-semibold">ClientHub</strong> &bull; Secure Real-Time Client Portal
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- Vue Application Bootstrap -->
+  <script>
+    const { createApp } = Vue;
+
+    createApp({
+      data() {
+        return {
+          loading: true,
+          error: '',
+          data: null,
+          project: null,
+          progress: {},
+          files: [],
+          billing: {}
+        };
+      },
+      async mounted() {
+        await this.loadPortalData();
+      },
+      methods: {
+        async loadPortalData() {
+          const urlParams = new URLSearchParams(window.location.search);
+          const token = urlParams.get('token');
+
+          if (!token) {
+            this.error = 'No portal access token provided in URL.';
+            this.loading = false;
+            return;
+          }
+
+          try {
+            const res = await axios.get('/api/portal/' + encodeURIComponent(token));
+            this.data = res.data?.data;
+            this.project = this.data?.project;
+            this.progress = this.data?.progress || {};
+            this.files = this.data?.files || [];
+            this.billing = this.data?.billing || {};
+            
+            if (this.project?.title) {
+              document.title = `${this.project.title} - Client Portal`;
+            }
+          } catch (err) {
+            this.error = err.response?.data?.message || 'Failed to load project portal. The link may have expired or been revoked.';
+          } finally {
+            this.loading = false;
+          }
+        },
+        formatCurrency(val) {
+          if (val === null || val === undefined) return 'Rp 0';
+          return 'Rp ' + Number(val).toLocaleString('id-ID');
+        },
+        formatDate(dateStr) {
+          if (!dateStr) return '-';
+          const d = new Date(dateStr);
+          return isNaN(d.getTime()) ? dateStr : d.toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' });
+        },
+        formatFileSize(bytes) {
+          if (!bytes || bytes === 0) return '0 B';
+          const k = 1024;
+          const sizes = ['B', 'KB', 'MB', 'GB'];
+          const i = Math.floor(Math.log(bytes) / Math.log(k));
+          return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        },
+        getStatusBadgeClass(status) {
+          const s = (status || '').toLowerCase();
+          if (s === 'completed') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+          if (s === 'in progress') return 'bg-blue-50 text-blue-700 border-blue-200';
+          if (s === 'on hold') return 'bg-amber-50 text-amber-700 border-amber-200';
+          if (s === 'cancelled') return 'bg-rose-50 text-rose-700 border-rose-200';
+          return 'bg-slate-100 text-slate-700 border-slate-200';
+        }
+      }
+    }).mount('#portal-app');
+  </script>
+</body>
+</html>

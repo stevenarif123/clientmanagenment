@@ -1,0 +1,1 @@
+import{c as a}from"./createLucideIcon-BQ81VKWg.js";import{c as o,o as t,r as n,n as c,u as l}from"./index-CZsEHLf2.js";const f={__name:"CardContent",props:{class:{type:null,required:!1}},setup(s){const e=s;return(r,p)=>(t(),o("div",{class:c(l(a)("p-6 pt-0",e.class))},[n(r.$slots,"default")],2))}};export{f as _};
