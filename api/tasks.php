@@ -25,11 +25,12 @@ function getProjectTasks(int $projectId): void {
          ORDER BY 
            CASE status 
              WHEN 'In Progress' THEN 1 
-             WHEN 'Todo' THEN 2 
-             WHEN 'Completed' THEN 3 
-             ELSE 4 
+             WHEN 'Review' THEN 2 
+             WHEN 'Todo' THEN 3 
+             WHEN 'Completed' THEN 4 
+             ELSE 5 
            END,
-           due_date ASC, 
+           order_index ASC, 
            id ASC",
         [$projectId]
     );
@@ -37,11 +38,13 @@ function getProjectTasks(int $projectId): void {
     $total = count($tasks);
     $completed = 0;
     $inProgress = 0;
+    $review = 0;
     $todo = 0;
 
     foreach ($tasks as $t) {
         if ($t['status'] === 'Completed') $completed++;
         else if ($t['status'] === 'In Progress') $inProgress++;
+        else if ($t['status'] === 'Review') $review++;
         else $todo++;
     }
 
@@ -53,6 +56,7 @@ function getProjectTasks(int $projectId): void {
             'total' => $total,
             'completed' => $completed,
             'in_progress' => $inProgress,
+            'review' => $review,
             'todo' => $todo,
             'progress_percent' => $progressPercent
         ]
@@ -81,9 +85,16 @@ function createProjectTask(int $projectId): void {
         Response::validationError($errors);
     }
 
-    $status = in_array($body['status'] ?? '', ['Todo', 'In Progress', 'Completed']) ? $body['status'] : 'Todo';
+    $status = in_array($body['status'] ?? '', ['Todo', 'In Progress', 'Review', 'Completed']) ? $body['status'] : 'Todo';
     $priority = in_array($body['priority'] ?? '', ['Low', 'Medium', 'High']) ? $body['priority'] : 'Medium';
     $completedAt = $status === 'Completed' ? date('Y-m-d H:i:s') : null;
+
+    // Auto-compute order_index: append to bottom of target column
+    $maxOrder = $db->fetch(
+        "SELECT COALESCE(MAX(order_index), 0) as max_order FROM project_tasks WHERE project_id = ? AND status = ?",
+        [$projectId, $status]
+    );
+    $orderIndex = floatval($maxOrder['max_order']) + 1000.0;
 
     $taskId = $db->insert('project_tasks', [
         'project_id' => $projectId,
@@ -92,7 +103,8 @@ function createProjectTask(int $projectId): void {
         'status' => $status,
         'priority' => $priority,
         'due_date' => !empty($body['due_date']) ? Validator::sanitize($body['due_date']) : null,
-        'completed_at' => $completedAt
+        'completed_at' => $completedAt,
+        'order_index' => $orderIndex
     ]);
 
     $task = $db->fetch("SELECT * FROM project_tasks WHERE id = ?", [$taskId]);
@@ -126,9 +138,12 @@ function updateTask(int $id): void {
     if (array_key_exists('due_date', $body)) {
         $updateData['due_date'] = !empty($body['due_date']) ? Validator::sanitize($body['due_date']) : null;
     }
-    if (isset($body['status']) && in_array($body['status'], ['Todo', 'In Progress', 'Completed'])) {
+    if (isset($body['status']) && in_array($body['status'], ['Todo', 'In Progress', 'Review', 'Completed'])) {
         $updateData['status'] = $body['status'];
         $updateData['completed_at'] = $body['status'] === 'Completed' ? date('Y-m-d H:i:s') : null;
+    }
+    if (isset($body['order_index'])) {
+        $updateData['order_index'] = floatval($body['order_index']);
     }
 
     $updateData['updated_at'] = date('Y-m-d H:i:s');

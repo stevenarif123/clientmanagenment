@@ -46,9 +46,10 @@ function getPortalData(string $token): void {
          ORDER BY 
            CASE status 
              WHEN 'In Progress' THEN 1 
-             WHEN 'Todo' THEN 2 
-             WHEN 'Completed' THEN 3 
-             ELSE 4 
+             WHEN 'Review' THEN 2 
+             WHEN 'Todo' THEN 3 
+             WHEN 'Completed' THEN 4 
+             ELSE 5 
            END, 
            due_date ASC, 
            id ASC",
