@@ -195,3 +195,105 @@ function deleteTask(int $id): void {
 
     Response::success(null, 'Task deleted successfully');
 }
+
+/**
+ * Get global task board data across active projects
+ */
+function getGlobalTaskBoard(): void {
+    $db = Database::getInstance();
+
+    $projectId = !empty($_GET['project_id']) ? (int)$_GET['project_id'] : null;
+
+    if ($projectId) {
+        $tasks = $db->fetchAll(
+            "SELECT t.*, p.title as project_title, p.status as project_status
+             FROM project_tasks t
+             JOIN projects p ON t.project_id = p.id
+             WHERE p.status NOT IN ('Completed', 'Cancelled')
+               AND p.id = ?
+             ORDER BY t.order_index ASC, t.id ASC",
+            [$projectId]
+        );
+    } else {
+        $tasks = $db->fetchAll(
+            "SELECT t.*, p.title as project_title, p.status as project_status
+             FROM project_tasks t
+             JOIN projects p ON t.project_id = p.id
+             WHERE p.status NOT IN ('Completed', 'Cancelled')
+             ORDER BY t.order_index ASC, t.id ASC"
+        );
+    }
+
+    $projects = $db->fetchAll(
+        "SELECT id, title FROM projects WHERE status NOT IN ('Completed', 'Cancelled') ORDER BY title ASC"
+    );
+
+    $total = count($tasks);
+    $completed = 0;
+    $inProgress = 0;
+    $review = 0;
+    $todo = 0;
+
+    foreach ($tasks as $t) {
+        if ($t['status'] === 'Completed') {
+            $completed++;
+        } else if ($t['status'] === 'In Progress') {
+            $inProgress++;
+        } else if ($t['status'] === 'Review') {
+            $review++;
+        } else {
+            $todo++;
+        }
+    }
+
+    $stats = [
+        'total' => $total,
+        'todo' => $todo,
+        'in_progress' => $inProgress,
+        'review' => $review,
+        'completed' => $completed
+    ];
+
+    Response::success([
+        'tasks' => $tasks,
+        'projects' => $projects,
+        'stats' => $stats
+    ]);
+}
+
+/**
+ * Batch reorder tasks within a project
+ */
+function reorderProjectTasks(int $projectId): void {
+    $db = Database::getInstance();
+
+    // Verify project exists
+    $project = $db->fetch("SELECT id FROM projects WHERE id = ?", [$projectId]);
+    if (!$project) {
+        Response::notFound('Project not found');
+    }
+
+    $body = json_decode(file_get_contents('php://input'), true) ?? [];
+    $tasks = $body['tasks'] ?? [];
+
+    if (!is_array($tasks)) {
+        Response::validationError(['tasks' => 'Tasks array is required']);
+    }
+
+    foreach ($tasks as $item) {
+        if (isset($item['id']) && isset($item['order_index'])) {
+            $db->update(
+                'project_tasks',
+                [
+                    'order_index' => floatval($item['order_index']),
+                    'updated_at' => date('Y-m-d H:i:s')
+                ],
+                'id = ? AND project_id = ?',
+                [(int)$item['id'], $projectId]
+            );
+        }
+    }
+
+    Response::success(null, 'Tasks reordered successfully');
+}
+

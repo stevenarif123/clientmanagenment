@@ -253,6 +253,16 @@ if (matchRoute('/payments/:id', $uri, $params) && $method === 'DELETE') {
 }
 
 // Task & Milestone Routes
+if ($uri === '/tasks/board' && $method === 'GET') {
+    require __DIR__ . '/api/tasks.php';
+    getGlobalTaskBoard();
+}
+
+if (matchRoute('/projects/:id/tasks/reorder', $uri, $params) && $method === 'POST') {
+    require __DIR__ . '/api/tasks.php';
+    reorderProjectTasks((int)$params['id']);
+}
+
 if (matchRoute('/projects/:id/tasks', $uri, $params) && $method === 'GET') {
     require __DIR__ . '/api/tasks.php';
     getProjectTasks((int)$params['id']);
