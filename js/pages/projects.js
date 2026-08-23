@@ -584,8 +584,32 @@ window.ProjectDetailView = {
 
       // Inline File Upload Data
       selectedFile: null,
-      selectedFileName: ''
+      selectedFileName: '',
+
+      // Kanban Board Data
+      taskViewMode: 'list',
+      kanbanColumns: [
+        { id: 'Todo', title: 'To Do', dotColor: 'bg-slate-400', badgeBg: 'bg-slate-200 text-slate-700' },
+        { id: 'In Progress', title: 'In Progress', dotColor: 'bg-amber-500', badgeBg: 'bg-amber-100 text-amber-700' },
+        { id: 'Review', title: 'Review', dotColor: 'bg-blue-500', badgeBg: 'bg-blue-100 text-blue-700' },
+        { id: 'Completed', title: 'Done', dotColor: 'bg-emerald-500', badgeBg: 'bg-emerald-100 text-emerald-700' }
+      ],
+      columnRefs: {},
+      sortableInstances: [],
+      expandedCardId: null,
+      editingTask: { title: '', description: '', priority: 'Medium', due_date: '', status: 'Todo' },
+      quickAddColumn: null,
+      quickAddTitle: ''
     };
+  },
+  watch: {
+    taskViewMode(newMode) {
+      if (newMode === 'board') {
+        this.$nextTick(() => this.initKanbanSortable());
+      } else {
+        this.destroyKanbanSortable();
+      }
+    }
   },
   computed: {
     filteredTasks() {
@@ -600,6 +624,9 @@ window.ProjectDetailView = {
   },
   async mounted() {
     await this.loadProject();
+  },
+  beforeUnmount() {
+    this.destroyKanbanSortable();
   },
   methods: {
     async loadProject() {
@@ -859,6 +886,176 @@ window.ProjectDetailView = {
       if (p === 'High') return 'bg-rose-50 text-rose-700 border-rose-200';
       if (p === 'Medium') return 'bg-amber-50 text-amber-700 border-amber-200';
       return 'bg-slate-100 text-slate-700 border-slate-200';
+    },
+
+    // KANBAN METHODS
+    getColumnTasks(status) {
+      return this.tasks
+        .filter(t => t.status === status)
+        .sort((a, b) => (parseFloat(a.order_index) || 0) - (parseFloat(b.order_index) || 0));
+    },
+    setColumnRef(colId, el) {
+      if (el) this.columnRefs[colId] = el;
+    },
+    initKanbanSortable() {
+      // Destroy existing instances
+      this.sortableInstances.forEach(s => s.destroy());
+      this.sortableInstances = [];
+
+      this.$nextTick(() => {
+        this.kanbanColumns.forEach(col => {
+          const el = this.columnRefs[col.id];
+          if (!el) return;
+
+          const instance = new Sortable(el, {
+            group: 'project-kanban',
+            animation: 180,
+            ghostClass: 'kanban-ghost',
+            chosenClass: 'kanban-chosen',
+            dragClass: 'kanban-drag',
+            onEnd: (evt) => {
+              const taskId = parseInt(evt.item.dataset.id, 10);
+              const toStatus = evt.to.dataset.status;
+              const newIndex = evt.newIndex;
+              this.handleCardDrop(taskId, toStatus, newIndex);
+            }
+          });
+          this.sortableInstances.push(instance);
+        });
+      });
+    },
+    destroyKanbanSortable() {
+      this.sortableInstances.forEach(s => s.destroy());
+      this.sortableInstances = [];
+      this.columnRefs = {};
+    },
+    async handleCardDrop(taskId, toStatus, newIndex) {
+      const task = this.tasks.find(t => t.id === taskId);
+      if (!task) return;
+
+      const snapshot = JSON.parse(JSON.stringify(this.tasks));
+      
+      // Calculate new order_index using fractional indexing
+      const targetTasks = this.tasks
+        .filter(t => t.status === toStatus && t.id !== taskId)
+        .sort((a, b) => (parseFloat(a.order_index) || 0) - (parseFloat(b.order_index) || 0));
+
+      let newOrder = 1000.0;
+      if (targetTasks.length === 0) {
+        newOrder = 1000.0;
+      } else if (newIndex === 0) {
+        newOrder = parseFloat(targetTasks[0].order_index) / 2.0;
+      } else if (newIndex >= targetTasks.length) {
+        newOrder = parseFloat(targetTasks[targetTasks.length - 1].order_index) + 1000.0;
+      } else {
+        const prev = parseFloat(targetTasks[newIndex - 1].order_index);
+        const next = parseFloat(targetTasks[newIndex].order_index);
+        newOrder = (prev + next) / 2.0;
+
+        // Precision guard — trigger rebalance if gap too small
+        if (Math.abs(next - prev) < 0.001) {
+          await this.rebalanceColumn(toStatus);
+          return;
+        }
+      }
+
+      // Optimistic update
+      task.status = toStatus;
+      task.order_index = newOrder;
+      if (toStatus === 'Completed') {
+        task.completed_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+      } else if (snapshot.find(t => t.id === taskId)?.status === 'Completed') {
+        task.completed_at = null;
+      }
+
+      try {
+        await window.API.tasks.update(taskId, { status: toStatus, order_index: newOrder });
+        // Refresh stats
+        const res = await window.API.projects.getTasks(this.id);
+        this.taskStats = res.data?.data?.stats || this.taskStats;
+      } catch (err) {
+        // Rollback on failure
+        this.tasks = snapshot;
+        window.Utils.toast('Failed to move task', 'error');
+      }
+    },
+    async rebalanceColumn(status) {
+      const columnTasks = this.tasks
+        .filter(t => t.status === status)
+        .sort((a, b) => (parseFloat(a.order_index) || 0) - (parseFloat(b.order_index) || 0));
+      
+      const reorderPayload = columnTasks.map((t, i) => {
+        t.order_index = (i + 1) * 1000.0;
+        return { id: t.id, order_index: t.order_index };
+      });
+
+      try {
+        await window.API.projects.reorderTasks(this.id, reorderPayload);
+      } catch (err) {
+        window.Utils.toast('Failed to rebalance task order', 'error');
+        this.loadProject();
+      }
+    },
+    expandCard(task) {
+      if (this.expandedCardId === task.id) {
+        this.expandedCardId = null;
+        return;
+      }
+      this.expandedCardId = task.id;
+      this.editingTask = {
+        title: task.title,
+        description: task.description || '',
+        priority: task.priority,
+        due_date: task.due_date || '',
+        status: task.status
+      };
+    },
+    async saveExpandedCard(taskId) {
+      try {
+        await window.API.tasks.update(taskId, this.editingTask);
+        this.expandedCardId = null;
+        window.Utils.toast('Task updated', 'success');
+        this.loadProject();
+      } catch (err) {
+        window.Utils.toast('Failed to update task', 'error');
+      }
+    },
+    cancelExpandCard() {
+      this.expandedCardId = null;
+    },
+    openQuickAdd(status) {
+      this.quickAddColumn = status;
+      this.quickAddTitle = '';
+      this.$nextTick(() => {
+        const input = this.$refs['quickadd_' + status];
+        if (input) {
+          if (Array.isArray(input)) {
+            input[0]?.focus?.();
+          } else {
+            input.focus?.();
+          }
+        }
+      });
+    },
+    async submitQuickAdd(status) {
+      if (!this.quickAddTitle.trim()) return;
+      try {
+        await window.API.projects.createTask(this.id, {
+          title: this.quickAddTitle.trim(),
+          status: status,
+          priority: 'Medium'
+        });
+        this.quickAddTitle = '';
+        this.quickAddColumn = null;
+        window.Utils.toast('Task added', 'success');
+        this.loadProject();
+      } catch (err) {
+        window.Utils.toast('Failed to add task', 'error');
+      }
+    },
+    cancelQuickAdd() {
+      this.quickAddColumn = null;
+      this.quickAddTitle = '';
     }
   },
   template: `
@@ -1144,6 +1341,7 @@ window.ProjectDetailView = {
                     >
                       <option value="Todo">Todo (Not Started)</option>
                       <option value="In Progress">In Progress</option>
+                      <option value="Review">Review</option>
                       <option value="Completed">Completed</option>
                     </select>
                   </div>
@@ -1169,9 +1367,21 @@ window.ProjectDetailView = {
               </form>
             </div>
 
-            <!-- Task Filter Bar -->
+            <!-- View Mode Switcher & Filter Toolbar -->
             <div class="p-4 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
               <div class="flex items-center gap-2">
+                <button @click="taskViewMode = 'list'"
+                  :class="['px-3 py-1.5 text-xs font-bold rounded-lg border transition-all', taskViewMode === 'list' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400']">
+                  ☰ List
+                </button>
+                <button @click="taskViewMode = 'board'"
+                  :class="['px-3 py-1.5 text-xs font-bold rounded-lg border transition-all', taskViewMode === 'board' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400']">
+                  ⊞ Board
+                </button>
+              </div>
+
+              <!-- List Filter Options (only visible when in list mode) -->
+              <div v-if="taskViewMode === 'list'" class="flex items-center gap-2">
                 <button
                   @click="taskFilter = 'all'"
                   :class="['px-3 py-1 text-xs font-semibold rounded-lg transition-colors', taskFilter === 'all' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-200']"
@@ -1191,12 +1401,10 @@ window.ProjectDetailView = {
                   Completed ({{ taskStats.completed }})
                 </button>
               </div>
-
-              <span class="text-xs text-slate-400 font-medium">Click checkbox to mark done</span>
             </div>
 
-            <!-- Tasks Checklist -->
-            <div class="divide-y divide-slate-100">
+            <!-- List View (when taskViewMode === 'list') -->
+            <div v-if="taskViewMode === 'list'" class="divide-y divide-slate-100">
               <div v-if="filteredTasks.length === 0" class="p-12 text-center text-sm text-slate-400">
                 No tasks found. Click "Add Task" to create your first milestone.
               </div>
@@ -1230,8 +1438,11 @@ window.ProjectDetailView = {
                       >
                         {{ t.priority }}
                       </span>
-                      <span v-if="t.status === 'In Progress'" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                      <span v-if="t.status === 'In Progress'" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
                         In Progress
+                      </span>
+                      <span v-if="t.status === 'Review'" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                        Review
                       </span>
                     </div>
 
@@ -1249,6 +1460,106 @@ window.ProjectDetailView = {
                   >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                   </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Kanban Board View (when taskViewMode === 'board') -->
+            <div v-else class="p-4 sm:p-6 overflow-x-auto">
+              <div class="flex items-start gap-4 min-h-[500px]" style="min-width: max-content;">
+                
+                <div v-for="col in kanbanColumns" :key="col.id"
+                  class="w-72 sm:w-80 shrink-0 bg-slate-100/80 rounded-2xl flex flex-col max-h-[600px] border border-slate-200 shadow-sm">
+                  
+                  <!-- Column Header -->
+                  <div class="p-3.5 flex items-center justify-between border-b border-slate-200/60">
+                    <div class="flex items-center gap-2">
+                      <span class="w-2.5 h-2.5 rounded-full" :class="col.dotColor"></span>
+                      <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700">{{ col.title }}</h3>
+                      <span class="px-2 py-0.5 text-[11px] font-bold rounded-full" :class="col.badgeBg">
+                        {{ getColumnTasks(col.id).length }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <!-- Scrollable Drop Zone -->
+                  <div :ref="(el) => setColumnRef(col.id, el)" :data-status="col.id"
+                    class="flex-1 overflow-y-auto p-2.5 space-y-2.5 min-h-[100px]">
+                    
+                    <div v-for="task in getColumnTasks(col.id)" :key="task.id" :data-id="task.id"
+                      class="bg-white rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-all cursor-grab active:cursor-grabbing">
+                      
+                      <!-- Card Content (Collapsed) -->
+                      <div class="p-3.5" @click="expandCard(task)">
+                        <div class="flex items-center justify-between mb-1.5">
+                          <span class="px-2 py-0.5 text-[10px] font-bold uppercase rounded-md border"
+                            :class="getPriorityClass(task.priority)">
+                            {{ task.priority }}
+                          </span>
+                          <span class="text-[11px] text-slate-400 font-medium">#{{ task.id }}</span>
+                        </div>
+                        <h4 class="text-sm font-semibold text-slate-800 leading-snug"
+                          :class="{ 'line-through text-slate-400': task.status === 'Completed' }">
+                          {{ task.title }}
+                        </h4>
+                        <p v-if="task.description" class="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
+                          {{ task.description }}
+                        </p>
+                        <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+                          <span v-if="task.due_date" class="flex items-center gap-1">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                            {{ task.due_date }}
+                          </span>
+                          <span v-else>No deadline</span>
+                          <span class="text-slate-300">{{ task.created_at ? task.created_at.slice(0, 10) : '' }}</span>
+                        </div>
+                        <div v-if="task.completed_at" class="mt-1.5 text-[10px] text-emerald-600 font-semibold">
+                          ✓ Done {{ task.completed_at.slice(0, 10) }}
+                        </div>
+                      </div>
+
+                      <!-- Expanded Inline Edit Form -->
+                      <div v-if="expandedCardId === task.id" class="border-t border-slate-200 p-3.5 bg-slate-50/50 rounded-b-xl space-y-3" @click.stop>
+                        <input v-model="editingTask.title" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-slate-900" placeholder="Task title">
+                        <textarea v-model="editingTask.description" rows="2" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-slate-900" placeholder="Description (optional)"></textarea>
+                        <div class="grid grid-cols-2 gap-2">
+                          <select v-model="editingTask.priority" class="px-2 py-1.5 text-xs border border-slate-300 rounded-lg">
+                            <option value="Low">Low</option>
+                            <option value="Medium">Medium</option>
+                            <option value="High">High</option>
+                          </select>
+                          <input v-model="editingTask.due_date" type="date" class="px-2 py-1.5 text-xs border border-slate-300 rounded-lg">
+                        </div>
+                        <select v-model="editingTask.status" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg">
+                          <option value="Todo">To Do</option>
+                          <option value="In Progress">In Progress</option>
+                          <option value="Review">Review</option>
+                          <option value="Completed">Done</option>
+                        </select>
+                        <div class="flex justify-end gap-2 pt-1">
+                          <button @click.stop="cancelExpandCard" class="px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50">Cancel</button>
+                          <button @click.stop="saveExpandedCard(task.id)" class="px-3 py-1.5 text-xs font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-800">Save</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Quick Add Footer -->
+                  <div class="p-2 border-t border-slate-200/60">
+                    <div v-if="quickAddColumn === col.id" class="p-2 space-y-2">
+                      <input :ref="'quickadd_' + col.id" v-model="quickAddTitle" @keyup.enter="submitQuickAdd(col.id)" @keyup.esc="cancelQuickAdd"
+                        class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-slate-900" placeholder="Task title...">
+                      <div class="flex gap-2">
+                        <button @click="submitQuickAdd(col.id)" class="flex-1 py-1.5 text-xs font-bold bg-slate-900 text-white rounded-lg hover:bg-slate-800">Add</button>
+                        <button @click="cancelQuickAdd" class="px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50">✕</button>
+                      </div>
+                    </div>
+                    <button v-else @click="openQuickAdd(col.id)"
+                      class="w-full py-2 px-3 flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 rounded-xl transition-all">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                      Add Task
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
