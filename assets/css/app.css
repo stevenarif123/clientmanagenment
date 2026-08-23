@@ -109,3 +109,25 @@ body {
     transform: rotate(360deg);
   }
 }
+
+/* ===== Kanban Board Drag & Drop ===== */
+.kanban-ghost {
+  background-color: rgba(226, 232, 240, 0.6) !important;
+  border: 2px dashed #94a3b8 !important;
+  border-radius: 0.75rem !important;
+  opacity: 0.5 !important;
+  box-shadow: none !important;
+}
+.kanban-ghost > * {
+  opacity: 0 !important;
+}
+.kanban-chosen {
+  cursor: grabbing !important;
+  transform: scale(1.03) rotate(1deg);
+  box-shadow: 0 12px 28px -5px rgba(0, 0, 0, 0.18), 0 8px 10px -6px rgba(0, 0, 0, 0.08) !important;
+  z-index: 50;
+}
+.kanban-drag {
+  opacity: 0.95 !important;
+  cursor: grabbing !important;
+}

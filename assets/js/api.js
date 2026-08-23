@@ -94,11 +94,13 @@ window.API = {
     // Tasks & Milestones
     getTasks: (id) => apiClient.get(`/projects/${id}/tasks`),
     createTask: (id, data) => apiClient.post(`/projects/${id}/tasks`, data),
+    reorderTasks: (id, tasks) => apiClient.post('/projects/' + id + '/tasks/reorder', { tasks }),
     regeneratePortalToken: (id) => apiClient.post(`/projects/${id}/regenerate-portal-token`)
   },
 
   // Standalone Tasks API
   tasks: {
+    board: (projectId) => apiClient.get('/tasks/board', { params: projectId ? { project_id: projectId } : {} }),
     update: (id, data) => apiClient.put(`/tasks/${id}`, data),
     toggle: (id) => apiClient.patch(`/tasks/${id}/toggle`),
     delete: (id) => apiClient.delete(`/tasks/${id}`)
