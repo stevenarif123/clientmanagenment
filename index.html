@@ -75,6 +75,7 @@
   <script src="js/pages/submissions.js"></script>
   <script src="js/pages/services.js"></script>
   <script src="js/pages/reports.js"></script>
+  <script src="js/pages/kanban.js"></script>
 
   <!-- Application Bootstrap & Routing Logic -->
   <script>
@@ -144,6 +145,9 @@
             this.currentRouteProps = { id: parseInt(projectDetailMatch[1]) };
             return window.ProjectDetailView;
           }
+
+          // Task Board Route
+          if (hash === '#/tasks') return window.KanbanBoardView;
 
           // Other Routes
           if (hash === '#/submissions') return window.SubmissionsView;
