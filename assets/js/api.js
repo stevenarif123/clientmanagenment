@@ -8,6 +8,7 @@ const getApiBase = () => {
   const dir = path.endsWith('/') ? path.slice(0, -1) : path;
   return `${dir}/api`;
 };
+window.getApiBase = getApiBase;
 
 const apiClient = axios.create({
   baseURL: getApiBase(),
@@ -113,7 +114,7 @@ window.API = {
 
   // Public Client Portal API
   portal: {
-    getData: (token) => axios.get(`/api/portal/${token}`)
+    getData: (token) => axios.get(`${getApiBase()}/portal/${encodeURIComponent(token)}`)
   },
 
   // Services API

@@ -3,19 +3,29 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ClientHub - Client & Project Management</title>
-  
-  <!-- Tailwind CSS CDN for utility rendering -->
+  <title>ClientHub - Client &amp; Project Management</title>
+
+  <!-- Inter Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
       darkMode: 'class',
       theme: {
         extend: {
+          fontFamily: {
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif']
+          },
           colors: {
             brand: {
-              50: '#f8fafc',
-              100: '#f1f5f9',
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              600: '#4f46e5',
+              700: '#4338ca',
               900: '#0f172a'
             }
           }
@@ -27,20 +37,25 @@
   <!-- Application Custom Styles -->
   <link rel="stylesheet" href="assets/css/app.css">
 
-  <!-- Vue 3, Axios & Chart.js CDNs -->
+  <!-- Vue 3, Axios, Chart.js & SortableJS CDNs -->
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 </head>
-<body class="h-full">
-  <div id="app" class="h-full">
+<body class="h-full antialiased text-slate-900">
+  <div id="app" v-cloak class="h-full">
     <!-- Toast Notifications Container -->
-    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none max-w-sm w-full px-4 sm:px-0"></div>
 
     <!-- Initial Bootstrapping Loader -->
     <div v-if="appLoading" class="min-h-screen bg-slate-50 flex flex-col items-center justify-center">
-      <div class="spinner w-10 h-10 border-3"></div>
+      <div class="w-11 h-11 rounded-xl bg-slate-900 text-white flex items-center justify-center mb-4 shadow-md">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+        </svg>
+      </div>
+      <div class="spinner spinner-lg text-slate-900"></div>
       <p class="text-sm font-semibold text-slate-600 mt-4 tracking-tight">Initializing ClientHub...</p>
     </div>
 
@@ -52,7 +67,7 @@
     <!-- Authenticated App Shell -->
     <template v-else>
       <app-layout :current-route="currentRoute">
-        <component :is="currentComponent" v-bind="currentRouteProps" />
+        <component :is="matchedRoute.component" v-bind="matchedRoute.props" :key="matchedRoute.key" />
       </app-layout>
     </template>
   </div>
@@ -89,91 +104,86 @@
         return {
           appLoading: true,
           auth: window.Auth,
-          currentRoute: window.location.hash || '#/',
-          currentRouteProps: {}
+          currentRoute: window.location.hash || '#/'
         };
       },
       computed: {
+        currentHashPath() {
+          return (this.currentRoute || '#/').split('?')[0];
+        },
         isGuestScreen() {
-          const route = this.currentRoute;
-          return route === '#/login' || route === '#/setup';
+          return this.currentHashPath === '#/login' || this.currentHashPath === '#/setup';
         },
         guestComponent() {
-          if (this.currentRoute === '#/setup' || window.Auth.needsSetup) {
+          if (this.currentHashPath === '#/setup' || window.Auth.needsSetup) {
             return window.SetupView;
           }
           return window.LoginView;
         },
-        currentComponent() {
-          const rawHash = this.currentRoute || '#/';
-          const hash = rawHash.split('?')[0];
+        matchedRoute() {
+          const hash = this.currentHashPath;
 
-          if (hash === '#/login') return window.LoginView;
-          if (hash === '#/setup') return window.SetupView;
-          if (hash === '#/' || hash === '' || hash === '#') return window.DashboardView;
-          
+          if (hash === '#/login') return { component: window.LoginView, props: {}, key: 'login' };
+          if (hash === '#/setup') return { component: window.SetupView, props: {}, key: 'setup' };
+          if (hash === '#/' || hash === '' || hash === '#') {
+            return { component: window.DashboardView, props: {}, key: 'dashboard' };
+          }
+
           // Clients Routes
-          if (hash === '#/clients') return window.ClientsView;
+          if (hash === '#/clients') return { component: window.ClientsView, props: {}, key: 'clients' };
           if (hash === '#/clients/new') {
-            this.currentRouteProps = { id: null };
-            return window.ClientFormView;
+            return { component: window.ClientFormView, props: { id: null }, key: 'client-new' };
           }
           const clientEditMatch = hash.match(/^#\/clients\/(\d+)\/edit$/);
           if (clientEditMatch) {
-            this.currentRouteProps = { id: parseInt(clientEditMatch[1]) };
-            return window.ClientFormView;
+            const id = parseInt(clientEditMatch[1], 10);
+            return { component: window.ClientFormView, props: { id }, key: `client-edit-${id}` };
           }
           const clientDetailMatch = hash.match(/^#\/clients\/(\d+)$/);
           if (clientDetailMatch) {
-            this.currentRouteProps = { id: parseInt(clientDetailMatch[1]) };
-            return window.ClientDetailView;
+            const id = parseInt(clientDetailMatch[1], 10);
+            return { component: window.ClientDetailView, props: { id }, key: `client-detail-${id}` };
           }
 
           // Projects Routes
-          if (hash === '#/projects') return window.ProjectsView;
+          if (hash === '#/projects') return { component: window.ProjectsView, props: {}, key: 'projects' };
           if (hash === '#/projects/new') {
-            this.currentRouteProps = { id: null };
-            return window.ProjectFormView;
+            return { component: window.ProjectFormView, props: { id: null }, key: 'project-new' };
           }
           const projectEditMatch = hash.match(/^#\/projects\/(\d+)\/edit$/);
           if (projectEditMatch) {
-            this.currentRouteProps = { id: parseInt(projectEditMatch[1]) };
-            return window.ProjectFormView;
+            const id = parseInt(projectEditMatch[1], 10);
+            return { component: window.ProjectFormView, props: { id }, key: `project-edit-${id}` };
           }
           const projectDetailMatch = hash.match(/^#\/projects\/(\d+)$/);
           if (projectDetailMatch) {
-            this.currentRouteProps = { id: parseInt(projectDetailMatch[1]) };
-            return window.ProjectDetailView;
+            const id = parseInt(projectDetailMatch[1], 10);
+            return { component: window.ProjectDetailView, props: { id }, key: `project-detail-${id}` };
           }
 
           // Task Board Route
-          if (hash === '#/tasks') return window.KanbanBoardView;
+          if (hash === '#/tasks') return { component: window.KanbanBoardView, props: {}, key: 'tasks' };
 
           // Other Routes
-          if (hash === '#/submissions') return window.SubmissionsView;
-          if (hash === '#/services') return window.ServicesView;
-          if (hash === '#/reports') return window.ReportsView;
+          if (hash === '#/submissions') return { component: window.SubmissionsView, props: {}, key: 'submissions' };
+          if (hash === '#/services') return { component: window.ServicesView, props: {}, key: 'services' };
+          if (hash === '#/reports') return { component: window.ReportsView, props: {}, key: 'reports' };
 
-          return window.DashboardView;
+          return { component: window.DashboardView, props: {}, key: 'dashboard-fallback' };
         }
-
-
       },
       async mounted() {
-        // Listen to URL hash change events
         window.addEventListener('hashchange', () => {
           this.currentRoute = window.location.hash || '#/';
           this.routeGuard();
         });
 
-        // Initialize and verify authentication
         await this.initApp();
       },
       methods: {
         async initApp() {
           this.appLoading = true;
 
-          // 1. Check if initial setup is required
           const needsSetup = await window.Auth.checkSetup();
           if (needsSetup) {
             this.currentRoute = '#/setup';
@@ -182,20 +192,18 @@
             return;
           }
 
-          // 2. Check active auth session
           if (window.Auth.token) {
             await window.Auth.checkAuth();
           }
 
-          // 3. Sync route based on auth status
           if (!window.Auth.isAuthenticated) {
             this.currentRoute = '#/login';
-            if (window.location.hash !== '#/login') {
+            if (this.currentHashPath !== '#/login') {
               window.location.hash = '#/login';
             }
           } else {
             this.currentRoute = window.location.hash || '#/';
-            if (this.currentRoute === '#/login' || this.currentRoute === '#/setup') {
+            if (this.currentHashPath === '#/login' || this.currentHashPath === '#/setup') {
               this.currentRoute = '#/';
               window.location.hash = '#/';
             }
@@ -204,9 +212,8 @@
           this.appLoading = false;
         },
         routeGuard() {
-          const hash = this.currentRoute;
+          const hash = this.currentHashPath;
 
-          // If setup is needed, force setup
           if (window.Auth.needsSetup) {
             if (hash !== '#/setup') {
               this.currentRoute = '#/setup';
@@ -215,7 +222,6 @@
             return;
           }
 
-          // If not authenticated and not on login/setup, redirect to login
           if (!window.Auth.isAuthenticated) {
             if (hash !== '#/login' && hash !== '#/setup') {
               this.currentRoute = '#/login';
@@ -224,11 +230,9 @@
             return;
           }
 
-          // If authenticated and on login/setup, redirect to dashboard
           if (window.Auth.isAuthenticated && (hash === '#/login' || hash === '#/setup')) {
             this.currentRoute = '#/';
             window.location.hash = '#/';
-            return;
           }
         }
       }

@@ -53,7 +53,7 @@ foreach ($item in $includeItems) {
 }
 
 # Ensure .htaccess files inside subdirectories are included
-$subHtaccess = @("data\.htaccess", "uploads\.htaccess")
+$subHtaccess = @("data\.htaccess", "uploads\.htaccess", "setup\.htaccess", "config\.htaccess", "middleware\.htaccess", "utils\.htaccess")
 foreach ($h in $subHtaccess) {
     $srcH = Join-Path $sourceDir $h
     $destH = Join-Path $stagingDir $h
@@ -61,6 +61,15 @@ foreach ($h in $subHtaccess) {
         $destDir = Split-Path $destH -Parent
         if (-not (Test-Path $destDir)) { New-Item -ItemType Directory -Path $destDir | Out-Null }
         Copy-Item -Path $srcH -Destination $destH -Force
+    }
+}
+
+# Remove CLI-only scripts from production package
+$cliOnlyScripts = @("setup\set-password.php")
+foreach ($s in $cliOnlyScripts) {
+    $target = Join-Path $stagingDir $s
+    if (Test-Path $target) {
+        Remove-Item $target -Force
     }
 }
 

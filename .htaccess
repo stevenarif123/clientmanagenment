@@ -4,9 +4,8 @@
 
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    RewriteBase /
 
-    # 1. Block access to sensitive files
+    # 1. Block direct access to sensitive files and internal directories
     <FilesMatch "(^\.env|\.sqlite|\.sql|\.log|\.git)">
         <IfModule authz_core_module>
             Require all denied
@@ -16,7 +15,10 @@
         </IfModule>
     </FilesMatch>
 
-    # 2. Route API requests to index.php
+    RewriteRule ^api/.*\.php$ - [F,L]
+    RewriteRule ^(config|data|setup|middleware|utils|logs)/ - [F,L]
+
+    # 2. Route API requests to index.php (works at root or any subfolder)
     RewriteRule ^api/(.*)$ index.php [QSA,L]
 
     # 3. Serve existing files and directories directly

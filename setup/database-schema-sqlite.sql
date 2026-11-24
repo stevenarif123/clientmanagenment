@@ -94,12 +94,12 @@ CREATE TABLE IF NOT EXISTS project_tasks (
     title TEXT NOT NULL,
     description TEXT,
     status TEXT DEFAULT 'Todo',
-    -- Status options: Todo, In Progress, Completed
+    -- Status options: Todo, In Progress, Review, Completed
     priority TEXT DEFAULT 'Medium',
     -- Priority options: Low, Medium, High
     due_date TEXT,
     completed_at TEXT,
-    order_index INTEGER DEFAULT 0,
+    order_index REAL DEFAULT 0,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
@@ -248,25 +248,32 @@ CREATE INDEX IF NOT EXISTS idx_logs_created ON api_logs(created_at);
 -- VIEWS FOR REPORTING
 -- =====================================================
 
--- Budget Summary View
+-- Budget Summary View (pre-aggregated to avoid cross-join multiplication)
 CREATE VIEW IF NOT EXISTS v_project_budget_summary AS
 SELECT 
     p.id AS project_id,
     p.title,
     p.total_budget,
     p.currency,
-    COALESCE(SUM(e.amount), 0) AS total_expenses,
-    COALESCE(SUM(CASE WHEN pay.status = 'Received' THEN pay.amount ELSE 0 END), 0) AS total_received,
-    p.total_budget - COALESCE(SUM(e.amount), 0) AS remaining_budget,
+    COALESCE(e.total_expenses, 0) AS total_expenses,
+    COALESCE(pay.total_received, 0) AS total_received,
+    p.total_budget - COALESCE(e.total_expenses, 0) AS remaining_budget,
     CASE 
         WHEN p.total_budget > 0 
-        THEN ROUND((COALESCE(SUM(e.amount), 0) / p.total_budget * 100), 2)
+        THEN ROUND((COALESCE(e.total_expenses, 0) / p.total_budget * 100), 2)
         ELSE 0 
     END AS budget_utilization_percent
 FROM projects p
-LEFT JOIN project_expenses e ON p.id = e.project_id
-LEFT JOIN project_payments pay ON p.id = pay.project_id
-GROUP BY p.id, p.title, p.total_budget, p.currency;
+LEFT JOIN (
+    SELECT project_id, SUM(amount) AS total_expenses
+    FROM project_expenses
+    GROUP BY project_id
+) e ON p.id = e.project_id
+LEFT JOIN (
+    SELECT project_id, SUM(CASE WHEN status = 'Received' THEN amount ELSE 0 END) AS total_received
+    FROM project_payments
+    GROUP BY project_id
+) pay ON p.id = pay.project_id;
 
 -- Client Summary View
 CREATE VIEW IF NOT EXISTS v_client_summary AS

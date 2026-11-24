@@ -4,12 +4,17 @@
  * Entry point for all API requests
  */
 
-// Error handling
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
+// Load configuration first so error visibility respects APP_DEBUG
+$config = require __DIR__ . '/config/.env.php';
+$isDebug = (bool)($config['APP_DEBUG'] ?? false);
 
-// Load configuration
+error_reporting($isDebug ? E_ALL : E_ALL & ~E_DEPRECATED & ~E_STRICT);
+ini_set('display_errors', $isDebug ? '1' : '0');
+ini_set('display_startup_errors', $isDebug ? '1' : '0');
+
+define('CLIENTHUB_ENTRYPOINT', true);
+
+// Load core modules
 require_once __DIR__ . '/config/constants.php';
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/middleware/auth.php';
@@ -21,7 +26,7 @@ require_once __DIR__ . '/utils/logger.php';
 $logger = null;
 
 // Set exception handler
-set_exception_handler(function ($e) use (&$logger) {
+set_exception_handler(function ($e) use (&$logger, $isDebug) {
     if ($logger === null) {
         $logger = new Logger();
     }
@@ -30,24 +35,26 @@ set_exception_handler(function ($e) use (&$logger) {
         'line' => $e->getLine(),
         'trace' => $e->getTraceAsString()
     ]);
-    
-    $config = require __DIR__ . '/config/.env.php';
-    $message = ($config['APP_DEBUG'] ?? false) ? $e->getMessage() : 'Internal server error';
+
+    $message = $isDebug ? $e->getMessage() : 'Internal server error';
     Response::serverError($message);
 });
 
 // CORS Headers
-$config = require __DIR__ . '/config/.env.php';
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+$allowedOrigins = $config['CORS_ALLOWED_ORIGINS'] ?? [];
 
-if (in_array($origin, $config['CORS_ALLOWED_ORIGINS'] ?? [])) {
+if (in_array('*', $allowedOrigins, true)) {
+    header("Access-Control-Allow-Origin: *");
+} elseif ($origin !== '' && in_array($origin, $allowedOrigins, true)) {
     header("Access-Control-Allow-Origin: {$origin}");
+    header("Vary: Origin");
 } elseif (($config['APP_ENV'] ?? 'development') === 'development') {
     header("Access-Control-Allow-Origin: *");
 }
 
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
+header("Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization, X-API-Key");
 header("Access-Control-Max-Age: 86400");
 
 // Handle preflight requests

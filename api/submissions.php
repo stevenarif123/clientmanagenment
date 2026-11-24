@@ -214,9 +214,9 @@ function convertToClient(int $id, array $body): void {
         'name' => $submission['name'],
         'email' => $submission['email'],
         'phone' => $submission['phone'],
-        'company' => $body['company'] ?? null,
-        'address' => $body['address'] ?? null,
-        'notes' => "Converted from contact form submission.\nOriginal message: " . $submission['message']
+        'company' => isset($body['company']) && $body['company'] !== '' ? Validator::sanitize((string)$body['company']) : null,
+        'address' => isset($body['address']) && $body['address'] !== '' ? Validator::sanitize((string)$body['address']) : null,
+        'notes' => "Converted from contact form submission.\nOriginal message: " . ($submission['message'] ?? '')
     ]);
     
     // Update submission

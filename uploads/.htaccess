@@ -24,5 +24,8 @@
     php_flag engine off
 </IfModule>
 
-# Disable directory browsing
+# Disable directory browsing & sniff protection
 Options -Indexes
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+</IfModule>

@@ -8,14 +8,15 @@ window.StatsCard = {
     value: { type: [String, Number], default: 0 },
     icon: { type: String, default: 'chart' },
     color: { type: String, default: 'blue' },
-    isCurrency: { type: Boolean, default: false }
+    isCurrency: { type: Boolean, default: false },
+    subtitle: { type: String, default: '' }
   },
   computed: {
     formattedValue() {
       if (this.isCurrency) {
         return window.Utils.formatCurrency(this.value);
       }
-      return Number(this.value).toLocaleString('id-ID');
+      return Number(this.value || 0).toLocaleString('id-ID');
     },
     iconSvg() {
       switch (this.icon) {
@@ -52,13 +53,14 @@ window.StatsCard = {
     }
   },
   template: `
-    <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-      <div>
-        <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">{{ title }}</p>
-        <p class="text-2xl font-bold text-slate-900 tabular-nums">{{ formattedValue }}</p>
+    <div class="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md hover:border-slate-300/80 transition-all flex items-center justify-between gap-4">
+      <div class="min-w-0">
+        <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">{{ title }}</p>
+        <p class="text-xl sm:text-2xl font-extrabold text-slate-900 tabular-nums tracking-tight truncate">{{ formattedValue }}</p>
+        <p v-if="subtitle" class="text-xs text-slate-400 mt-1 truncate">{{ subtitle }}</p>
       </div>
-      <div :class="['w-12 h-12 rounded-xl flex items-center justify-center shrink-0 border', colorClasses.bg, colorClasses.border]">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+      <div :class="['w-11 h-11 rounded-xl flex items-center justify-center shrink-0 border', colorClasses.bg, colorClasses.border]">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" :d="iconSvg" />
         </svg>
       </div>

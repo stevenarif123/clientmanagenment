@@ -69,12 +69,17 @@ function createPayment(int $projectId, array $body): void {
         Response::notFound('Project not found');
     }
     
+    // Default payment_date if omitted by API caller
+    if (empty($body['payment_date'])) {
+        $body['payment_date'] = date('Y-m-d');
+    }
+
     // Validate input
     $validator = new Validator($body);
     $validator
         ->required('amount', 'Amount is required')
         ->numeric('amount')
-        ->positive('amount')
+        ->greaterThanZero('amount')
         ->required('payment_date', 'Payment date is required')
         ->date('payment_date')
         ->inArray('status', PAYMENT_STATUSES)
@@ -111,12 +116,17 @@ function updatePayment(int $id, array $body): void {
         Response::notFound('Payment not found');
     }
     
+    // Default payment_date if omitted by API caller
+    if (empty($body['payment_date'])) {
+        $body['payment_date'] = date('Y-m-d');
+    }
+
     // Validate input
     $validator = new Validator($body);
     $validator
         ->required('amount', 'Amount is required')
         ->numeric('amount')
-        ->positive('amount')
+        ->greaterThanZero('amount')
         ->required('payment_date', 'Payment date is required')
         ->date('payment_date')
         ->inArray('status', PAYMENT_STATUSES)

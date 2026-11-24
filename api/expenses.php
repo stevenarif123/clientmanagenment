@@ -65,7 +65,7 @@ function createExpense(int $projectId, array $body): void {
         ->maxLength('description', 255, 'Description must not exceed 255 characters')
         ->required('amount', 'Amount is required')
         ->numeric('amount')
-        ->positive('amount')
+        ->greaterThanZero('amount')
         ->required('expense_date', 'Expense date is required')
         ->date('expense_date')
         ->inArray('category', EXPENSE_CATEGORIES);
@@ -108,7 +108,7 @@ function updateExpense(int $id, array $body): void {
         ->maxLength('description', 255, 'Description must not exceed 255 characters')
         ->required('amount', 'Amount is required')
         ->numeric('amount')
-        ->positive('amount')
+        ->greaterThanZero('amount')
         ->required('expense_date', 'Expense date is required')
         ->date('expense_date')
         ->inArray('category', EXPENSE_CATEGORIES);

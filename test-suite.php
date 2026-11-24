@@ -3,6 +3,11 @@
  * Automated Verification Test Suite
  */
 
+if (php_sapi_name() !== 'cli') {
+    http_response_code(403);
+    exit('CLI only');
+}
+
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
@@ -216,6 +221,74 @@ foreach ($requiredFiles as $file) {
     }
 }
 echo "   [OK] All " . count($requiredFiles) . " asset, page & portal files exist and are verified.\n";
+
+// Test 7: Security Guards, Validator Entity Preservation & Cross-Join View Accuracy
+echo "\n7. Testing security .htaccess files, Validator::sanitize & v_project_budget_summary...\n";
+$securityHtaccessFiles = [
+    'setup/.htaccess',
+    'config/.htaccess',
+    'middleware/.htaccess',
+    'utils/.htaccess',
+    'uploads/.htaccess',
+    'data/.htaccess'
+];
+foreach ($securityHtaccessFiles as $htFile) {
+    if (!file_exists(__DIR__ . '/' . $htFile)) {
+        throw new Exception("Missing security file: {$htFile}");
+    }
+}
+echo "   [OK] All " . count($securityHtaccessFiles) . " directory protection .htaccess files exist.\n";
+
+require_once __DIR__ . '/utils/validator.php';
+$rawSample = 'A & B "Test" <Brand>';
+$sanitized = Validator::sanitize($rawSample);
+if ($sanitized !== $rawSample) {
+    throw new Exception("Validator::sanitize mutated clean input: expected '{$rawSample}', got '{$sanitized}'");
+}
+echo "   [OK] Validator::sanitize preserves ampersands and quotes without HTML double-encoding.\n";
+
+$testDb = $db->getConnection();
+$testDb->beginTransaction();
+try {
+    $clientId = $testDb->query("SELECT id FROM clients LIMIT 1")->fetchColumn();
+    if (!$clientId) {
+        $stmt = $testDb->prepare("INSERT INTO clients (name, email) VALUES (?, ?)");
+        $stmt->execute(['__Test CrossJoin Client__', 'crossjoin-test@example.com']);
+        $clientId = $testDb->lastInsertId();
+    }
+
+    $serviceId = $testDb->query("SELECT id FROM services LIMIT 1")->fetchColumn();
+    if (!$serviceId) {
+        $stmt = $testDb->prepare("INSERT INTO services (name) VALUES (?)");
+        $stmt->execute(['__Test Service__']);
+        $serviceId = $testDb->lastInsertId();
+    }
+
+    $stmt = $testDb->prepare("INSERT INTO projects (client_id, service_id, title, status, total_budget) VALUES (?, ?, ?, ?, ?)");
+    $stmt->execute([$clientId, $serviceId, '__Test CrossJoin Project__', 'In Progress', 1000000]);
+    $tempProjectId = $testDb->lastInsertId();
+
+    $expStmt = $testDb->prepare("INSERT INTO project_expenses (project_id, category, description, amount, expense_date) VALUES (?, ?, ?, ?, ?)");
+    $expStmt->execute([$tempProjectId, 'Software', 'License A', 100000, date('Y-m-d')]);
+    $expStmt->execute([$tempProjectId, 'Software', 'License B', 200000, date('Y-m-d')]);
+
+    $payStmt = $testDb->prepare("INSERT INTO project_payments (project_id, amount, payment_date, payment_method, status) VALUES (?, ?, ?, ?, ?)");
+    $payStmt->execute([$tempProjectId, 400000, date('Y-m-d'), 'Bank Transfer', 'Received']);
+    $payStmt->execute([$tempProjectId, 250000, date('Y-m-d'), 'Bank Transfer', 'Received']);
+
+    $viewStmt = $testDb->prepare("SELECT total_expenses, total_received FROM v_project_budget_summary WHERE project_id = ?");
+    $viewStmt->execute([$tempProjectId]);
+    $summary = $viewStmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$summary || (float)$summary['total_expenses'] !== 300000.0 || (float)$summary['total_received'] !== 650000.0) {
+        throw new Exception("Cross-join aggregation mismatch in v_project_budget_summary: " . json_encode($summary));
+    }
+    echo "   [OK] v_project_budget_summary computes exact sums without Cartesian multiplication.\n";
+} finally {
+    if ($testDb->inTransaction()) {
+        $testDb->rollBack();
+    }
+}
 
 echo "\n============================================\n";
 echo "   ALL TESTS PASSED SUCCESSFULLY! (100%)\n";

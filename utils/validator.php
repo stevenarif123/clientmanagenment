@@ -16,7 +16,7 @@ class Validator {
      * Required field validation
      */
     public function required(string $field, ?string $message = null): self {
-        if (!isset($this->data[$field]) || trim($this->data[$field]) === '') {
+        if (!isset($this->data[$field]) || trim((string)$this->data[$field]) === '') {
             $this->errors[$field] = $message ?? "{$field} is required";
         }
         return $this;
@@ -26,7 +26,7 @@ class Validator {
      * Email validation
      */
     public function email(string $field, ?string $message = null): self {
-        if (isset($this->data[$field]) && !empty($this->data[$field])) {
+        if (isset($this->data[$field]) && trim((string)$this->data[$field]) !== '') {
             if (!filter_var($this->data[$field], FILTER_VALIDATE_EMAIL)) {
                 $this->errors[$field] = $message ?? "Invalid email format";
             }
@@ -38,7 +38,7 @@ class Validator {
      * Minimum length validation
      */
     public function minLength(string $field, int $min, ?string $message = null): self {
-        if (isset($this->data[$field]) && strlen($this->data[$field]) < $min) {
+        if (isset($this->data[$field]) && strlen((string)$this->data[$field]) < $min) {
             $this->errors[$field] = $message ?? "{$field} must be at least {$min} characters";
         }
         return $this;
@@ -48,7 +48,7 @@ class Validator {
      * Maximum length validation
      */
     public function maxLength(string $field, int $max, ?string $message = null): self {
-        if (isset($this->data[$field]) && strlen($this->data[$field]) > $max) {
+        if (isset($this->data[$field]) && strlen((string)$this->data[$field]) > $max) {
             $this->errors[$field] = $message ?? "{$field} must not exceed {$max} characters";
         }
         return $this;
@@ -58,7 +58,7 @@ class Validator {
      * Numeric validation
      */
     public function numeric(string $field, ?string $message = null): self {
-        if (isset($this->data[$field]) && !empty($this->data[$field])) {
+        if (isset($this->data[$field]) && $this->data[$field] !== '' && $this->data[$field] !== null) {
             if (!is_numeric($this->data[$field])) {
                 $this->errors[$field] = $message ?? "{$field} must be a number";
             }
@@ -67,12 +67,24 @@ class Validator {
     }
 
     /**
-     * Positive number validation
+     * Non-negative number validation (>= 0)
      */
     public function positive(string $field, ?string $message = null): self {
         if (isset($this->data[$field]) && is_numeric($this->data[$field])) {
             if ((float)$this->data[$field] < 0) {
-                $this->errors[$field] = $message ?? "{$field} must be a positive number";
+                $this->errors[$field] = $message ?? "{$field} must be zero or a positive number";
+            }
+        }
+        return $this;
+    }
+
+    /**
+     * Strictly positive number validation (> 0)
+     */
+    public function greaterThanZero(string $field, ?string $message = null): self {
+        if (isset($this->data[$field]) && is_numeric($this->data[$field])) {
+            if ((float)$this->data[$field] <= 0) {
+                $this->errors[$field] = $message ?? "{$field} must be greater than 0";
             }
         }
         return $this;
@@ -82,9 +94,9 @@ class Validator {
      * Date validation (Y-m-d format)
      */
     public function date(string $field, ?string $message = null): self {
-        if (isset($this->data[$field]) && !empty($this->data[$field])) {
-            $date = \DateTime::createFromFormat('Y-m-d', $this->data[$field]);
-            if (!$date || $date->format('Y-m-d') !== $this->data[$field]) {
+        if (isset($this->data[$field]) && trim((string)$this->data[$field]) !== '') {
+            $date = \DateTime::createFromFormat('Y-m-d', (string)$this->data[$field]);
+            if (!$date || $date->format('Y-m-d') !== (string)$this->data[$field]) {
                 $this->errors[$field] = $message ?? "Invalid date format (expected YYYY-MM-DD)";
             }
         }
@@ -95,8 +107,8 @@ class Validator {
      * In array validation
      */
     public function inArray(string $field, array $allowed, ?string $message = null): self {
-        if (isset($this->data[$field]) && !empty($this->data[$field])) {
-            if (!in_array($this->data[$field], $allowed)) {
+        if (isset($this->data[$field]) && $this->data[$field] !== '' && $this->data[$field] !== null) {
+            if (!in_array($this->data[$field], $allowed, true)) {
                 $this->errors[$field] = $message ?? "{$field} must be one of: " . implode(', ', $allowed);
             }
         }
@@ -107,10 +119,8 @@ class Validator {
      * Phone number validation (basic)
      */
     public function phone(string $field, ?string $message = null): self {
-        if (isset($this->data[$field]) && !empty($this->data[$field])) {
-            // Remove spaces, dashes, and parentheses
-            $phone = preg_replace('/[\s\-\(\)]/', '', $this->data[$field]);
-            // Check if it's a valid phone format (starts with + or digit, 8-15 digits)
+        if (isset($this->data[$field]) && trim((string)$this->data[$field]) !== '') {
+            $phone = preg_replace('/[\s\-\(\)]/', '', (string)$this->data[$field]);
             if (!preg_match('/^\+?[0-9]{8,15}$/', $phone)) {
                 $this->errors[$field] = $message ?? "Invalid phone number format";
             }
@@ -122,8 +132,8 @@ class Validator {
      * Integer validation
      */
     public function integer(string $field, ?string $message = null): self {
-        if (isset($this->data[$field]) && !empty($this->data[$field])) {
-            if (!filter_var($this->data[$field], FILTER_VALIDATE_INT)) {
+        if (isset($this->data[$field]) && $this->data[$field] !== '' && $this->data[$field] !== null) {
+            if (filter_var($this->data[$field], FILTER_VALIDATE_INT) === false) {
                 $this->errors[$field] = $message ?? "{$field} must be an integer";
             }
         }
@@ -159,10 +169,13 @@ class Validator {
     }
 
     /**
-     * Sanitize string input
+     * Sanitize string input for safe UTF-8 database storage.
+     * Note: Prepared statements prevent SQL injection and frontend/HTML templates
+     * escape output on render, so avoid HTML-encoding before DB storage to prevent
+     * double-escaping entities like "&amp;".
      */
     public static function sanitize(string $input): string {
-        return htmlspecialchars(trim($input), ENT_QUOTES, 'UTF-8');
+        return str_replace("\0", '', trim($input));
     }
 
     /**

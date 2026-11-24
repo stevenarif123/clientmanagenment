@@ -3,8 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Client Portal - Project Progress & Deliverables</title>
-  
+  <title>Client Portal - Project Progress &amp; Deliverables</title>
+
+  <!-- Inter Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Vue 3 & Axios CDNs -->
@@ -13,6 +18,9 @@
 
   <style>
     [v-cloak] { display: none; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
     .spinner {
       border: 2px solid rgba(226, 232, 240, 0.8);
       border-top-color: #0f172a;
@@ -32,11 +40,11 @@
       <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         <div class="flex items-center gap-3">
           <div class="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-sm shadow">
-            CP
+            CH
           </div>
           <div>
-            <span class="font-bold text-slate-900 text-base tracking-tight block">ClientHub Portal</span>
-            <span class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Live Project Tracking</span>
+            <span class="font-bold text-slate-900 text-base tracking-tight block leading-none">ClientHub Portal</span>
+            <span class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block mt-1">Live Project Tracking</span>
           </div>
         </div>
 
@@ -72,7 +80,7 @@
       <div v-else-if="data" class="space-y-8">
         
         <!-- Welcome & Project Hero Card -->
-        <div class="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-sm">
+        <div class="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-8 shadow-sm">
           <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
               <p class="text-xs font-bold uppercase tracking-wider text-slate-400">
@@ -83,20 +91,20 @@
               <p class="text-sm font-medium text-slate-500 mt-1">{{ project.service_name }}</p>
             </div>
 
-            <!-- Overall Progress Circular Badge -->
+            <!-- Overall Progress Badge -->
             <div class="flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200/80 shrink-0">
               <div class="text-right">
                 <span class="text-[10px] font-bold uppercase text-slate-400 tracking-wider block">Execution</span>
                 <span class="text-2xl font-black text-slate-900 tabular-nums">{{ progress.work_percent }}%</span>
               </div>
-              <div class="w-12 h-12 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm">
+              <div class="w-12 h-12 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm tabular-nums">
                 {{ progress.completed_tasks }}/{{ progress.total_tasks }}
               </div>
             </div>
           </div>
 
-          <!-- Description if exists -->
-          <p v-if="project.description" class="mt-5 text-sm text-slate-600 leading-relaxed bg-slate-50/50 p-4 rounded-xl border border-slate-100">
+          <!-- Description -->
+          <p v-if="project.description" class="mt-5 text-sm text-slate-600 leading-relaxed bg-slate-50/70 p-4 rounded-xl border border-slate-100 whitespace-pre-line">
             {{ project.description }}
           </p>
 
@@ -112,21 +120,27 @@
             </div>
             <div class="col-span-2 sm:col-span-1">
               <span class="text-slate-400 font-semibold block uppercase text-[10px]">Payment Status</span>
-              <span class="text-emerald-700 font-bold mt-0.5 block">{{ billing.payment_percent }}% Settled</span>
+              <span class="text-emerald-700 font-bold mt-0.5 block tabular-nums">{{ billing.payment_percent }}% Settled</span>
             </div>
           </div>
         </div>
 
         <!-- Section 1: Work Milestones & Tasks -->
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
           <div class="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h2 class="text-lg font-bold text-slate-900">Work Milestones & Deliverable Tasks</h2>
+              <h2 class="text-lg font-bold text-slate-900">Work Milestones &amp; Deliverable Tasks</h2>
               <p class="text-xs text-slate-500 mt-0.5">Real-time status of items being developed, tested, and delivered</p>
             </div>
-            <div class="flex items-center gap-2">
-              <span class="text-xs font-semibold px-2.5 py-1 bg-blue-50 text-blue-700 rounded-lg border border-blue-200">
-                {{ progress.completed_tasks }} of {{ progress.total_tasks }} Completed
+            <div class="flex flex-wrap items-center gap-2 text-xs">
+              <span class="font-semibold px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-200">
+                {{ progress.completed_tasks }}/{{ progress.total_tasks }} Done
+              </span>
+              <span v-if="progress.in_progress_tasks > 0" class="font-semibold px-2.5 py-1 bg-amber-50 text-amber-700 rounded-lg border border-amber-200">
+                {{ progress.in_progress_tasks }} Active
+              </span>
+              <span v-if="progress.review_tasks > 0" class="font-semibold px-2.5 py-1 bg-blue-50 text-blue-700 rounded-lg border border-blue-200">
+                {{ progress.review_tasks }} Review
               </span>
             </div>
           </div>
@@ -134,7 +148,7 @@
           <!-- Progress Bar -->
           <div class="w-full bg-slate-100 h-2">
             <div
-              class="h-full bg-blue-600 transition-all duration-500"
+              class="h-full bg-indigo-600 transition-all duration-500"
               :style="{ width: progress.work_percent + '%' }"
             ></div>
           </div>
@@ -180,7 +194,7 @@
                 </div>
               </div>
 
-              <span v-if="t.completed_at" class="text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md shrink-0 border border-emerald-100">
+              <span v-if="t.completed_at" class="text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg shrink-0 border border-emerald-100">
                 Done {{ formatDate(t.completed_at) }}
               </span>
             </div>
@@ -188,9 +202,9 @@
         </div>
 
         <!-- Section 2: Deliverables & Files Download -->
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
           <div class="p-6 border-b border-slate-100">
-            <h2 class="text-lg font-bold text-slate-900">Deliverables & Project Files</h2>
+            <h2 class="text-lg font-bold text-slate-900">Deliverables &amp; Project Files</h2>
             <p class="text-xs text-slate-500 mt-0.5">Download design assets, documents, reports, and project outputs</p>
           </div>
 
@@ -201,23 +215,23 @@
             <div
               v-for="f in files"
               :key="f.id"
-              class="p-4 sm:p-5 flex items-center justify-between hover:bg-slate-50 transition-colors"
+              class="p-4 sm:p-5 flex items-center justify-between hover:bg-slate-50 transition-colors gap-3"
             >
               <div class="flex items-center gap-3 min-w-0">
                 <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 border border-slate-200">
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                 </div>
                 <div class="min-w-0">
-                  <a :href="f.file_url" target="_blank" class="font-semibold text-slate-900 hover:underline text-sm truncate block">{{ f.original_name }}</a>
+                  <a :href="resolveFileUrl(f.file_url)" target="_blank" class="font-semibold text-slate-900 hover:underline text-sm truncate block">{{ f.original_name }}</a>
                   <p class="text-xs text-slate-400 mt-0.5">{{ formatFileSize(f.file_size) }} &bull; Uploaded {{ formatDate(f.uploaded_at) }}</p>
                 </div>
               </div>
 
               <a
-                :href="f.file_url"
+                :href="resolveFileUrl(f.file_url)"
                 target="_blank"
                 download
-                class="px-4 py-2 text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-lg shadow-sm transition-colors flex items-center gap-1.5 shrink-0"
+                class="px-4 py-2 text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-xl shadow-sm transition-colors flex items-center gap-1.5 shrink-0"
               >
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                 Download
@@ -227,10 +241,22 @@
         </div>
 
         <!-- Section 3: Billing & Invoicing Summary -->
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
-          <div class="mb-6">
-            <h2 class="text-lg font-bold text-slate-900">Billing & Payment Summary</h2>
-            <p class="text-xs text-slate-500 mt-0.5">Summary of contracted budget, payments received, and remaining balance</p>
+        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 sm:p-8">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+            <div>
+              <h2 class="text-lg font-bold text-slate-900">Billing &amp; Payment Summary</h2>
+              <p class="text-xs text-slate-500 mt-0.5">Summary of contracted budget, payments received, and remaining balance</p>
+            </div>
+            <span class="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 self-start sm:self-auto tabular-nums">
+              {{ billing.payment_percent }}% Paid
+            </span>
+          </div>
+
+          <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden mb-6">
+            <div
+              class="h-full bg-emerald-500 transition-all duration-500"
+              :style="{ width: Math.min(100, billing.payment_percent || 0) + '%' }"
+            ></div>
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
@@ -250,7 +276,7 @@
 
           <!-- Payments Recorded -->
           <div v-if="billing.payments && billing.payments.length > 0" class="mt-6 pt-6 border-t border-slate-100">
-            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Receipts & Transactions</h4>
+            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Receipts &amp; Transactions</h4>
             <div class="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
               <div
                 v-for="(pay, idx) in billing.payments"
@@ -258,12 +284,12 @@
                 class="p-3.5 bg-white flex items-center justify-between text-xs"
               >
                 <div>
-                  <span class="font-bold text-slate-900">{{ formatCurrency(pay.amount) }}</span>
+                  <span class="font-bold text-slate-900 tabular-nums">{{ formatCurrency(pay.amount) }}</span>
                   <span class="text-slate-500 ml-2">&bull; {{ pay.payment_method || 'Payment' }}</span>
                 </div>
                 <div class="flex items-center gap-3">
                   <span class="text-slate-400">{{ formatDate(pay.payment_date) }}</span>
-                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                  <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold border" :class="getPaymentStatusBadgeClass(pay.status)">
                     {{ pay.status }}
                   </span>
                 </div>
@@ -322,7 +348,7 @@
             this.progress = this.data?.progress || {};
             this.files = this.data?.files || [];
             this.billing = this.data?.billing || {};
-            
+
             if (this.project?.title) {
               document.title = `${this.project.title} - Client Portal`;
             }
@@ -331,6 +357,16 @@
           } finally {
             this.loading = false;
           }
+        },
+        resolveFileUrl(url) {
+          if (!url) return '#';
+          if (/^https?:\/\//i.test(url)) return url;
+          const baseDir = window.location.pathname.replace(/\/portal\.html$/i, '').replace(/\/+$/, '');
+          const cleanRel = url.replace(/^\/+/, '');
+          if (baseDir && cleanRel.startsWith(baseDir.replace(/^\/+/, '') + '/')) {
+            return '/' + cleanRel;
+          }
+          return `${baseDir}/${cleanRel}`;
         },
         formatCurrency(val) {
           if (val === null || val === undefined) return 'Rp 0';
@@ -352,9 +388,16 @@
           const s = (status || '').toLowerCase();
           if (s === 'completed') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
           if (s === 'review') return 'bg-blue-50 text-blue-700 border-blue-200';
-          if (s === 'in progress') return 'bg-amber-50 text-amber-700 border-amber-200';
+          if (s === 'in progress') return 'bg-blue-50 text-blue-700 border-blue-200';
           if (s === 'on hold') return 'bg-amber-50 text-amber-700 border-amber-200';
           if (s === 'cancelled') return 'bg-rose-50 text-rose-700 border-rose-200';
+          return 'bg-slate-100 text-slate-700 border-slate-200';
+        },
+        getPaymentStatusBadgeClass(status) {
+          const s = (status || '').toLowerCase();
+          if (s === 'received') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+          if (s === 'pending') return 'bg-amber-50 text-amber-700 border-amber-200';
+          if (s === 'refunded') return 'bg-rose-50 text-rose-700 border-rose-200';
           return 'bg-slate-100 text-slate-700 border-slate-200';
         }
       }

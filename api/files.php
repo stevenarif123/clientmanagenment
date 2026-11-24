@@ -84,9 +84,10 @@ function uploadFile(array $files, array $data, int $adminId): void {
         Response::error($message, 400);
     }
     
-    // Check file size (5MB max)
+    // Check file size limit
+    $maxMb = (int)round(MAX_FILE_SIZE / 1048576);
     if ($file['size'] > MAX_FILE_SIZE) {
-        Response::error('File size exceeds 5MB limit', 400);
+        Response::error("File size exceeds {$maxMb}MB limit", 400);
     }
     
     // Check file extension
@@ -141,17 +142,17 @@ function uploadFile(array $files, array $data, int $adminId): void {
         Response::error('Failed to save uploaded file', 500);
     }
     
-    // Generate URL (relative so it works seamlessly on any domain/host)
+    // Generate relative URL so downloads work seamlessly on root, subdomain, or subfolder deployments
     $config = $db->getConfig();
     $baseUrl = rtrim($config['APP_URL'] ?? '', '/');
-    $fileUrl = ($baseUrl !== '' ? $baseUrl : '') . '/uploads/' . $subDir . '/' . $newFilename;
+    $fileUrl = ($baseUrl !== '' ? $baseUrl . '/' : '') . 'uploads/' . $subDir . '/' . $newFilename;
     
     // Save to database
     $fileId = $db->insert('file_uploads', [
         'project_id' => $projectId,
         'client_id' => $clientId,
         'file_name' => $newFilename,
-        'original_name' => $file['name'],
+        'original_name' => basename($file['name']),
         'file_url' => $fileUrl,
         'file_size' => $file['size'],
         'file_type' => $file['type'],
@@ -175,16 +176,18 @@ function deleteFile(int $id): void {
         Response::notFound('File not found');
     }
     
-    // Try to delete physical file
-    $uploadDir = __DIR__ . '/../uploads/';
-    
-    // Extract path from URL
-    $urlPath = parse_url($file['file_url'], PHP_URL_PATH);
-    $relativePath = str_replace('/uploads/', '', $urlPath);
-    $filePath = $uploadDir . $relativePath;
-    
-    if (file_exists($filePath)) {
-        unlink($filePath);
+    // Resolve physical path safely inside uploads/ directory
+    $uploadDir = realpath(__DIR__ . '/../uploads');
+    if ($uploadDir !== false) {
+        $urlPath = parse_url($file['file_url'], PHP_URL_PATH) ?: '';
+        if (preg_match('#uploads/(.+)$#', $urlPath, $matches)) {
+            $relativePath = ltrim($matches[1], '/');
+            $candidatePath = $uploadDir . DIRECTORY_SEPARATOR . str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $relativePath);
+            $realFilePath = realpath($candidatePath);
+            if ($realFilePath !== false && strpos($realFilePath, $uploadDir . DIRECTORY_SEPARATOR) === 0 && is_file($realFilePath)) {
+                unlink($realFilePath);
+            }
+        }
     }
     
     // Delete from database

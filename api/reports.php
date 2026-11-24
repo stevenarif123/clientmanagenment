@@ -121,28 +121,35 @@ function getFinancialReport(array $params): void {
         [$startDate, $endDate]
     );
     
-    // Completed projects count
+    // Completed projects count (use date() so updated_at timestamps on endDate are included)
     $completedProjects = $db->fetch(
         "SELECT COUNT(*) as count
          FROM projects
          WHERE status = 'Completed'
-         AND updated_at BETWEEN ? AND ?",
+         AND date(updated_at) BETWEEN ? AND ?",
         [$startDate, $endDate]
     )['count'] ?? 0;
     
-    // Projects with financial data
+    // Projects with financial data (pre-aggregated to prevent cross-join multiplication)
     $projects = $db->fetchAll(
         "SELECT p.id, p.title, c.name as client_name,
-                COALESCE(SUM(e.amount), 0) as total_expenses,
-                COALESCE(SUM(CASE WHEN pay.status = 'Received' THEN pay.amount ELSE 0 END), 0) as total_received
+                COALESCE(e.total_expenses, 0) as total_expenses,
+                COALESCE(pay.total_received, 0) as total_received
          FROM projects p
          LEFT JOIN clients c ON p.client_id = c.id
-         LEFT JOIN project_expenses e ON p.id = e.project_id 
-            AND e.expense_date BETWEEN ? AND ?
-         LEFT JOIN project_payments pay ON p.id = pay.project_id 
-            AND pay.payment_date BETWEEN ? AND ?
-         GROUP BY p.id, c.name
-         HAVING COALESCE(SUM(e.amount), 0) > 0 OR COALESCE(SUM(CASE WHEN pay.status = 'Received' THEN pay.amount ELSE 0 END), 0) > 0
+         LEFT JOIN (
+            SELECT project_id, SUM(amount) as total_expenses
+            FROM project_expenses
+            WHERE expense_date BETWEEN ? AND ?
+            GROUP BY project_id
+         ) e ON p.id = e.project_id
+         LEFT JOIN (
+            SELECT project_id, SUM(CASE WHEN status = 'Received' THEN amount ELSE 0 END) as total_received
+            FROM project_payments
+            WHERE payment_date BETWEEN ? AND ?
+            GROUP BY project_id
+         ) pay ON p.id = pay.project_id
+         WHERE COALESCE(e.total_expenses, 0) > 0 OR COALESCE(pay.total_received, 0) > 0
          ORDER BY total_received DESC",
         [$startDate, $endDate, $startDate, $endDate]
     );
@@ -201,17 +208,24 @@ function getBudgetOverview(array $params): void {
         [$year]
     );
     
-    // Top projects by budget
+    // Top projects by budget (pre-aggregated to avoid cross-join multiplication)
     $topProjects = $db->fetchAll(
         "SELECT p.id, p.title, p.total_budget, p.status,
                 c.name as client_name,
-                COALESCE(SUM(e.amount), 0) as total_expenses,
-                COALESCE(SUM(CASE WHEN pay.status = 'Received' THEN pay.amount ELSE 0 END), 0) as total_received
+                COALESCE(e.total_expenses, 0) as total_expenses,
+                COALESCE(pay.total_received, 0) as total_received
          FROM projects p
          LEFT JOIN clients c ON p.client_id = c.id
-         LEFT JOIN project_expenses e ON p.id = e.project_id
-         LEFT JOIN project_payments pay ON p.id = pay.project_id
-         GROUP BY p.id, c.name
+         LEFT JOIN (
+            SELECT project_id, SUM(amount) as total_expenses
+            FROM project_expenses
+            GROUP BY project_id
+         ) e ON p.id = e.project_id
+         LEFT JOIN (
+            SELECT project_id, SUM(CASE WHEN status = 'Received' THEN amount ELSE 0 END) as total_received
+            FROM project_payments
+            GROUP BY project_id
+         ) pay ON p.id = pay.project_id
          ORDER BY p.total_budget DESC
          LIMIT 10"
     );
@@ -269,16 +283,23 @@ function exportProjects(array $params): void {
     $endDate = $params['end_date'] ?? null;
     $where = [];
     $queryParams = [];
+    $expWhere = '';
+    $payWhere = '';
+    $subParams = [];
     
-    if (!empty($status) && in_array($status, PROJECT_STATUSES)) {
+    if ($startDate && $endDate) {
+        $expWhere = "WHERE expense_date BETWEEN ? AND ?";
+        $payWhere = "WHERE payment_date BETWEEN ? AND ?";
+        $subParams = [$startDate, $endDate, $startDate, $endDate];
+    }
+
+    if (!empty($status) && in_array($status, PROJECT_STATUSES, true)) {
         $where[] = "p.status = ?";
         $queryParams[] = $status;
     }
-    
+
     if ($startDate && $endDate) {
-        $where[] = "(e.expense_date BETWEEN ? AND ? OR pay.payment_date BETWEEN ? AND ?)";
-        $queryParams[] = $startDate;
-        $queryParams[] = $endDate;
+        $where[] = "(COALESCE(e.total_expenses, 0) > 0 OR COALESCE(pay.total_received, 0) > 0 OR date(p.created_at) BETWEEN ? AND ?)";
         $queryParams[] = $startDate;
         $queryParams[] = $endDate;
     }
@@ -288,18 +309,27 @@ function exportProjects(array $params): void {
     $projects = $db->fetchAll(
         "SELECT p.id, p.title, c.name as client_name, s.name as service_name,
                 p.status, p.start_date, p.end_date, p.total_budget, p.currency,
-                COALESCE(SUM(e.amount), 0) as total_expenses,
-                COALESCE(SUM(CASE WHEN pay.status = 'Received' THEN pay.amount ELSE 0 END), 0) as total_received,
+                COALESCE(e.total_expenses, 0) as total_expenses,
+                COALESCE(pay.total_received, 0) as total_received,
                 p.created_at
          FROM projects p
          LEFT JOIN clients c ON p.client_id = c.id
          LEFT JOIN services s ON p.service_id = s.id
-         LEFT JOIN project_expenses e ON p.id = e.project_id
-         LEFT JOIN project_payments pay ON p.id = pay.project_id
+         LEFT JOIN (
+            SELECT project_id, SUM(amount) as total_expenses
+            FROM project_expenses
+            {$expWhere}
+            GROUP BY project_id
+         ) e ON p.id = e.project_id
+         LEFT JOIN (
+            SELECT project_id, SUM(CASE WHEN status = 'Received' THEN amount ELSE 0 END) as total_received
+            FROM project_payments
+            {$payWhere}
+            GROUP BY project_id
+         ) pay ON p.id = pay.project_id
          {$whereClause}
-         GROUP BY p.id, c.name, s.name
          ORDER BY p.created_at DESC",
-        $queryParams
+        array_merge($subParams, $queryParams)
     );
     
     $format = $params['format'] ?? 'csv';
@@ -421,36 +451,30 @@ function exportToPDF(array $data, string $filename, string $title = 'Report'): v
     echo '<meta charset="UTF-8">';
     echo '<title>' . htmlspecialchars($title) . '</title>';
     echo '<style>';
-    echo 'body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }';
-    echo '.container { background: white; padding: 30px; max-width: 1200px; margin: 0 auto; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }';
-    echo 'h1 { color: #333; border-bottom: 3px solid #333; padding-bottom: 10px; margin-bottom: 20px; }';
-    echo 'table { width: 100%; border-collapse: collapse; margin-top: 20px; }';
-    echo 'th { background: #333; color: white; padding: 12px 8px; text-align: left; font-weight: 600; }';
-    echo 'td { border: 1px solid #ddd; padding: 10px 8px; }';
-    echo 'tr:nth-child(even) { background: #f9f9f9; }';
-    echo 'tr:hover { background: #f0f0f0; }';
-    echo '.meta { color: #666; font-size: 14px; margin: 20px 0; }';
-    echo '.actions { margin: 20px 0; padding: 15px; background: #f0f0f0; border-radius: 5px; }';
-    echo '.btn { background: #333; color: white; padding: 10px 20px; border: none; cursor: pointer; border-radius: 4px; font-size: 14px; margin-right: 10px; }';
-    echo '.btn:hover { background: #555; }';
-    echo '.currency { text-align: right; font-family: monospace; }';
-    echo '@media print { ';
-    echo '  body { background: white; margin: 0; }';
-    echo '  .container { box-shadow: none; padding: 0; }';
-    echo '  .actions { display: none; }';
-    echo '  @page { margin: 1cm; }';
-    echo '}';
+    echo 'body { font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 24px; background: #f8fafc; color: #0f172a; }';
+    echo '.container { background: white; padding: 32px; max-width: 1120px; margin: 0 auto; border-radius: 12px; border: 1px solid #e2e8f0; }';
+    echo 'h1 { color: #0f172a; font-size: 22px; margin: 0 0 6px 0; }';
+    echo 'table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }';
+    echo 'th { background: #0f172a; color: white; padding: 10px 10px; text-align: left; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }';
+    echo 'td { border-bottom: 1px solid #e2e8f0; padding: 10px; }';
+    echo 'tr:nth-child(even) td { background: #f8fafc; }';
+    echo '.meta { color: #64748b; font-size: 12px; margin: 0 0 18px 0; }';
+    echo '.actions { margin-bottom: 20px; padding: 12px 16px; background: #f1f5f9; border-radius: 8px; display: flex; gap: 10px; }';
+    echo '.btn { background: #0f172a; color: white; padding: 8px 16px; border: none; cursor: pointer; border-radius: 6px; font-size: 13px; font-weight: 600; }';
+    echo '.btn-secondary { background: white; color: #334155; border: 1px solid #cbd5e1; }';
+    echo '.currency { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }';
+    echo '@media print { body { background: white; margin: 0; } .container { border: none; padding: 0; } .actions { display: none; } @page { margin: 1.2cm; } }';
     echo '</style>';
     echo '</head><body>';
     echo '<div class="container">';
     
     echo '<div class="actions">';
-    echo '<button class="btn" onclick="window.print()">🖨️ Print / Save as PDF</button>';
-    echo '<button class="btn" onclick="window.close()">✖ Close</button>';
+    echo '<button class="btn" onclick="window.print()">Print / Save as PDF</button>';
+    echo '<button class="btn btn-secondary" onclick="window.close()">Close</button>';
     echo '</div>';
     
-    echo '<h1>' . htmlspecialchars($title) . '</h1>';
-    echo '<p class="meta">Generated: ' . date('Y-m-d H:i:s') . ' | Total Records: ' . count($data) . '</p>';
+    echo '<h1>ClientHub — ' . htmlspecialchars($title) . '</h1>';
+    echo '<p class="meta">Generated: ' . date('Y-m-d H:i:s') . ' &bull; Total Records: ' . count($data) . '</p>';
     echo '<table>';
     
     // Headers

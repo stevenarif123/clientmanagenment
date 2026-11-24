@@ -22,20 +22,20 @@ function getClients(array $params): void {
     $queryParams = [];
     
     if (!empty($search)) {
-        $where = "WHERE name LIKE ? OR email LIKE ? OR company LIKE ? OR phone LIKE ?";
+        $where = "WHERE c.name LIKE ? OR c.email LIKE ? OR c.company LIKE ? OR c.phone LIKE ?";
         $searchTerm = "%{$search}%";
         $queryParams = [$searchTerm, $searchTerm, $searchTerm, $searchTerm];
     }
     
     // Get total count
-    $countSql = "SELECT COUNT(*) as total FROM clients {$where}";
+    $countSql = "SELECT COUNT(*) as total FROM clients c {$where}";
     $countResult = $db->fetch($countSql, $queryParams);
     $total = (int)($countResult['total'] ?? 0);
     
     // Get clients with project counts
     $sql = "SELECT c.*, 
                    COUNT(DISTINCT p.id) as total_projects,
-                   SUM(CASE WHEN p.status = 'In Progress' THEN 1 ELSE 0 END) as active_projects,
+                   COALESCE(SUM(CASE WHEN p.status = 'In Progress' THEN 1 ELSE 0 END), 0) as active_projects,
                    COALESCE(SUM(p.total_budget), 0) as total_budget
             FROM clients c
             LEFT JOIN projects p ON c.id = p.client_id
@@ -55,16 +55,25 @@ function getClients(array $params): void {
 function getClient(int $id): void {
     $db = Database::getInstance();
     
+    // Use pre-aggregated subqueries per project to prevent cross-join multiplication
     $sql = "SELECT c.*,
                    COUNT(DISTINCT p.id) as total_projects,
-                   SUM(CASE WHEN p.status = 'In Progress' THEN 1 ELSE 0 END) as active_projects,
+                   COALESCE(SUM(CASE WHEN p.status = 'In Progress' THEN 1 ELSE 0 END), 0) as active_projects,
                    COALESCE(SUM(p.total_budget), 0) as total_budget,
-                   COALESCE(SUM(CASE WHEN pay.status = 'Received' THEN pay.amount ELSE 0 END), 0) as total_received,
-                   COALESCE(SUM(exp.amount), 0) as total_expenses
+                   COALESCE(SUM(ps.total_received), 0) as total_received,
+                   COALESCE(SUM(es.total_expenses), 0) as total_expenses
             FROM clients c
             LEFT JOIN projects p ON c.id = p.client_id
-            LEFT JOIN project_payments pay ON p.id = pay.project_id
-            LEFT JOIN project_expenses exp ON p.id = exp.project_id
+            LEFT JOIN (
+                SELECT project_id, SUM(CASE WHEN status = 'Received' THEN amount ELSE 0 END) as total_received
+                FROM project_payments
+                GROUP BY project_id
+            ) ps ON p.id = ps.project_id
+            LEFT JOIN (
+                SELECT project_id, SUM(amount) as total_expenses
+                FROM project_expenses
+                GROUP BY project_id
+            ) es ON p.id = es.project_id
             WHERE c.id = ?
             GROUP BY c.id";
     
@@ -74,14 +83,23 @@ function getClient(int $id): void {
         Response::notFound('Client not found');
     }
     
-    // Get recent projects
+    // Get all projects for this client with financial summaries
     $projects = $db->fetchAll(
-        "SELECT p.*, s.name as service_name
+        "SELECT p.*, s.name as service_name,
+                COALESCE(ps.total_received, 0) as total_received,
+                COALESCE(es.total_expenses, 0) as total_expenses
          FROM projects p
          LEFT JOIN services s ON p.service_id = s.id
+         LEFT JOIN (
+             SELECT project_id, SUM(CASE WHEN status = 'Received' THEN amount ELSE 0 END) as total_received
+             FROM project_payments GROUP BY project_id
+         ) ps ON p.id = ps.project_id
+         LEFT JOIN (
+             SELECT project_id, SUM(amount) as total_expenses
+             FROM project_expenses GROUP BY project_id
+         ) es ON p.id = es.project_id
          WHERE p.client_id = ?
-         ORDER BY p.created_at DESC
-         LIMIT 5",
+         ORDER BY p.created_at DESC",
         [$id]
     );
     

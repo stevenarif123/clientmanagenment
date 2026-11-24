@@ -126,21 +126,30 @@ function updateTask(int $id): void {
     $body = json_decode(file_get_contents('php://input'), true) ?? [];
 
     $updateData = [];
-    if (isset($body['title'])) {
-        $updateData['title'] = Validator::sanitize($body['title']);
+    if (array_key_exists('title', $body)) {
+        if (trim((string)$body['title']) === '') {
+            Response::validationError(['title' => 'Task title cannot be empty']);
+        }
+        $updateData['title'] = Validator::sanitize((string)$body['title']);
     }
     if (array_key_exists('description', $body)) {
-        $updateData['description'] = !empty($body['description']) ? Validator::sanitize($body['description']) : null;
+        $updateData['description'] = !empty($body['description']) ? Validator::sanitize((string)$body['description']) : null;
     }
-    if (isset($body['priority']) && in_array($body['priority'], ['Low', 'Medium', 'High'])) {
+    if (isset($body['priority']) && in_array($body['priority'], ['Low', 'Medium', 'High'], true)) {
         $updateData['priority'] = $body['priority'];
     }
     if (array_key_exists('due_date', $body)) {
-        $updateData['due_date'] = !empty($body['due_date']) ? Validator::sanitize($body['due_date']) : null;
+        $updateData['due_date'] = !empty($body['due_date']) ? Validator::sanitize((string)$body['due_date']) : null;
     }
-    if (isset($body['status']) && in_array($body['status'], ['Todo', 'In Progress', 'Review', 'Completed'])) {
+    if (isset($body['status']) && in_array($body['status'], ['Todo', 'In Progress', 'Review', 'Completed'], true)) {
         $updateData['status'] = $body['status'];
-        $updateData['completed_at'] = $body['status'] === 'Completed' ? date('Y-m-d H:i:s') : null;
+        if ($body['status'] === 'Completed') {
+            $updateData['completed_at'] = $existing['status'] === 'Completed' && !empty($existing['completed_at'])
+                ? $existing['completed_at']
+                : date('Y-m-d H:i:s');
+        } else {
+            $updateData['completed_at'] = null;
+        }
     }
     if (isset($body['order_index'])) {
         $updateData['order_index'] = floatval($body['order_index']);

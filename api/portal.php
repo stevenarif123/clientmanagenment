@@ -58,8 +58,14 @@ function getPortalData(string $token): void {
 
     $totalTasks = count($tasks);
     $completedTasks = 0;
+    $inProgressTasks = 0;
+    $reviewTasks = 0;
+    $todoTasks = 0;
     foreach ($tasks as $t) {
         if ($t['status'] === 'Completed') $completedTasks++;
+        elseif ($t['status'] === 'In Progress') $inProgressTasks++;
+        elseif ($t['status'] === 'Review') $reviewTasks++;
+        else $todoTasks++;
     }
     $workProgressPercent = $totalTasks > 0 ? (int)round(($completedTasks / $totalTasks) * 100) : 0;
 
@@ -71,6 +77,11 @@ function getPortalData(string $token): void {
          ORDER BY uploaded_at DESC",
         [$projectId]
     );
+    foreach ($files as &$f) {
+        if (isset($f['file_url']) && strpos($f['file_url'], '/uploads/') === 0) {
+            $f['file_url'] = ltrim($f['file_url'], '/');
+        }
+    }
 
     // 4. Fetch Payment Progress Summary (Safe client-facing summary)
     $paymentSummary = $db->fetch(
@@ -110,6 +121,9 @@ function getPortalData(string $token): void {
             'work_percent' => $workProgressPercent,
             'total_tasks' => $totalTasks,
             'completed_tasks' => $completedTasks,
+            'in_progress_tasks' => $inProgressTasks,
+            'review_tasks' => $reviewTasks,
+            'todo_tasks' => $todoTasks,
             'tasks' => $tasks
         ],
         'files' => $files,

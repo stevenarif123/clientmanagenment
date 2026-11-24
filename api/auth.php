@@ -15,7 +15,7 @@ function handleCheckSetup(): void {
     $db = Database::getInstance();
     
     $result = $db->fetch("SELECT COUNT(*) as count FROM admins");
-    $needsSetup = ($result['count'] ?? 0) === 0;
+    $needsSetup = (int)($result['count'] ?? 0) === 0;
     
     Response::success(['needs_setup' => $needsSetup]);
 }
@@ -28,7 +28,7 @@ function handleSetup(array $body): void {
     
     // Check if setup already done
     $result = $db->fetch("SELECT COUNT(*) as count FROM admins");
-    if (($result['count'] ?? 0) > 0) {
+    if ((int)($result['count'] ?? 0) > 0) {
         Response::error('Setup already completed', 400);
     }
     
@@ -121,8 +121,10 @@ function handleLogout(string $token): void {
         Response::error('No active session', 400);
     }
     
-    $auth = new AuthMiddleware();
-    $auth->destroySession($token);
+    if ($token !== 'api_key_session') {
+        $auth = new AuthMiddleware();
+        $auth->destroySession($token);
+    }
     
     Response::success(null, 'Logged out successfully');
 }

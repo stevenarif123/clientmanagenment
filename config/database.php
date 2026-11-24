@@ -81,7 +81,7 @@ class Database {
                     priority TEXT DEFAULT 'Medium',
                     due_date TEXT,
                     completed_at TEXT,
-                    order_index INTEGER DEFAULT 0,
+                    order_index REAL DEFAULT 0,
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
                 );
@@ -108,6 +108,36 @@ class Database {
                 $stmt = $this->connection->prepare("UPDATE projects SET portal_token = ? WHERE id = ?");
                 $stmt->execute([$token, $p['id']]);
             }
+
+            // 4. Ensure v_project_budget_summary uses subquery aggregation (no cross-join multiplication)
+            $this->connection->exec("DROP VIEW IF EXISTS v_project_budget_summary;");
+            $this->connection->exec("
+                CREATE VIEW v_project_budget_summary AS
+                SELECT 
+                    p.id AS project_id,
+                    p.title,
+                    p.total_budget,
+                    p.currency,
+                    COALESCE(e.total_expenses, 0) AS total_expenses,
+                    COALESCE(pay.total_received, 0) AS total_received,
+                    p.total_budget - COALESCE(e.total_expenses, 0) AS remaining_budget,
+                    CASE 
+                        WHEN p.total_budget > 0 
+                        THEN ROUND((COALESCE(e.total_expenses, 0) / p.total_budget * 100), 2)
+                        ELSE 0 
+                    END AS budget_utilization_percent
+                FROM projects p
+                LEFT JOIN (
+                    SELECT project_id, SUM(amount) AS total_expenses
+                    FROM project_expenses
+                    GROUP BY project_id
+                ) e ON p.id = e.project_id
+                LEFT JOIN (
+                    SELECT project_id, SUM(CASE WHEN status = 'Received' THEN amount ELSE 0 END) AS total_received
+                    FROM project_payments
+                    GROUP BY project_id
+                ) pay ON p.id = pay.project_id;
+            ");
         } catch (Exception $e) {
             // Ignore if tables do not exist yet
         }

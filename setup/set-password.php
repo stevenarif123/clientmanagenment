@@ -1,4 +1,8 @@
 <?php
+if (php_sapi_name() !== 'cli') {
+    http_response_code(403);
+    exit('Forbidden: CLI execution only.');
+}
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../middleware/auth.php';
 
