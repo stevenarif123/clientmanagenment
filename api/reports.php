@@ -80,6 +80,78 @@ function getDashboardStats(): void {
          GROUP BY strftime('%Y-%m', payment_date)
          ORDER BY month ASC"
     );
+
+    // Real task workload counts
+    $taskRow = $db->fetch(
+        "SELECT
+            COUNT(*) as total,
+            SUM(CASE WHEN status = 'Todo' THEN 1 ELSE 0 END) as todo,
+            SUM(CASE WHEN status = 'In Progress' THEN 1 ELSE 0 END) as in_progress,
+            SUM(CASE WHEN status = 'Review' THEN 1 ELSE 0 END) as review,
+            SUM(CASE WHEN status = 'Completed' THEN 1 ELSE 0 END) as completed,
+            SUM(CASE WHEN status != 'Completed' AND due_date IS NOT NULL AND due_date != '' AND date(due_date) < date('now') THEN 1 ELSE 0 END) as overdue
+         FROM project_tasks"
+    );
+
+    // Tasks grouped by priority
+    $tasksByPriority = $db->fetchAll(
+        "SELECT priority, COUNT(*) as count
+         FROM project_tasks
+         GROUP BY priority"
+    );
+
+    // Active projects progress via pre-aggregated subquery (no cross-join multiplication)
+    $activeProjectsProgress = $db->fetchAll(
+        "SELECT
+            p.id,
+            p.title,
+            p.status,
+            c.name as client_name,
+            COALESCE(t.task_total, 0) as task_total,
+            COALESCE(t.task_completed, 0) as task_completed,
+            CASE
+                WHEN COALESCE(t.task_total, 0) > 0
+                THEN ROUND((COALESCE(t.task_completed, 0) * 100.0) / t.task_total)
+                ELSE 0
+            END as task_progress
+         FROM projects p
+         LEFT JOIN clients c ON p.client_id = c.id
+         LEFT JOIN (
+            SELECT
+                project_id,
+                COUNT(*) as task_total,
+                SUM(CASE WHEN status = 'Completed' THEN 1 ELSE 0 END) as task_completed
+            FROM project_tasks
+            GROUP BY project_id
+         ) t ON p.id = t.project_id
+         WHERE p.status NOT IN ('Cancelled', 'Completed')
+         ORDER BY p.updated_at DESC, p.id DESC
+         LIMIT 8"
+    );
+    foreach ($activeProjectsProgress as &$apRow) {
+        $apRow['id'] = (int)$apRow['id'];
+        $apRow['task_total'] = (int)$apRow['task_total'];
+        $apRow['task_completed'] = (int)$apRow['task_completed'];
+        $apRow['task_progress'] = (int)$apRow['task_progress'];
+    }
+    unset($apRow);
+
+    // Recent tasks across projects
+    $recentTasks = $db->fetchAll(
+        "SELECT
+            pt.id,
+            pt.project_id,
+            p.title as project_title,
+            pt.title,
+            pt.status,
+            pt.priority,
+            pt.due_date,
+            pt.updated_at
+         FROM project_tasks pt
+         LEFT JOIN projects p ON pt.project_id = p.id
+         ORDER BY pt.updated_at DESC, pt.id DESC
+         LIMIT 6"
+    );
     
     Response::success([
         'counts' => [
@@ -88,6 +160,17 @@ function getDashboardStats(): void {
             'active_projects' => (int)$activeProjects,
             'pending_submissions' => (int)$pendingSubmissions
         ],
+        'task_counts' => [
+            'total' => (int)($taskRow['total'] ?? 0),
+            'todo' => (int)($taskRow['todo'] ?? 0),
+            'in_progress' => (int)($taskRow['in_progress'] ?? 0),
+            'review' => (int)($taskRow['review'] ?? 0),
+            'completed' => (int)($taskRow['completed'] ?? 0),
+            'overdue' => (int)($taskRow['overdue'] ?? 0)
+        ],
+        'tasks_by_priority' => $tasksByPriority,
+        'active_projects_progress' => $activeProjectsProgress,
+        'recent_tasks' => $recentTasks,
         'budget' => [
             'total_budget' => (float)($budgetStats['total_budget'] ?? 0),
             'total_expenses' => (float)($budgetStats['total_expenses'] ?? 0),

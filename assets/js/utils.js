@@ -1,8 +1,35 @@
 /**
- * Utility Functions for Client Management System
+ * Utility & Theme Functions for ClientHub Workspace
  */
 
 window.Utils = {
+  /**
+   * Read active theme ('light' or 'dark')
+   */
+  getTheme() {
+    return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+  },
+
+  /**
+   * Apply and persist theme mode across pages, dispatching event for charts
+   */
+  setTheme(mode) {
+    const isDark = mode === 'dark';
+    document.documentElement.classList.toggle('dark', isDark);
+    try {
+      localStorage.setItem('clienthub_theme', isDark ? 'dark' : 'light');
+    } catch (e) {}
+    window.dispatchEvent(new CustomEvent('clienthub-theme-change', { detail: { theme: isDark ? 'dark' : 'light' } }));
+    return isDark ? 'dark' : 'light';
+  },
+
+  /**
+   * Toggle between light and dark themes
+   */
+  toggleTheme() {
+    return this.setTheme(this.getTheme() === 'dark' ? 'light' : 'dark');
+  },
+
   /**
    * Format number as Indonesian Rupiah (IDR)
    */
@@ -116,21 +143,49 @@ window.Utils = {
   },
 
   /**
-   * Project status badge styling
+   * 8px square semantic indicator class for projects or tasks
+   */
+  getStatusDotClass(status) {
+    switch (status) {
+      case 'In Progress':
+        return 'st-blue';
+      case 'Completed':
+      case 'Received':
+      case 'Converted':
+        return 'st-green';
+      case 'Review':
+      case 'On Hold':
+        return 'st-amber';
+      case 'Cancelled':
+      case 'Refunded':
+      case 'Spam':
+        return 'st-red';
+      case 'Pending':
+      case 'Todo':
+      case 'New':
+      default:
+        return 'st-neutral';
+    }
+  },
+
+  /**
+   * Project / Task status badge styling (Light + Dark token safe)
    */
   getStatusBadgeClass(status) {
     switch (status) {
       case 'In Progress':
-        return 'bg-blue-50 text-blue-700 border-blue-200';
+        return 'badge-blue';
       case 'Completed':
-        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+        return 'badge-green';
+      case 'Review':
       case 'On Hold':
-        return 'bg-amber-50 text-amber-700 border-amber-200';
+        return 'badge-amber';
       case 'Cancelled':
-        return 'bg-rose-50 text-rose-700 border-rose-200';
+        return 'badge-red';
       case 'Pending':
+      case 'Todo':
       default:
-        return 'bg-slate-100 text-slate-700 border-slate-200';
+        return 'badge-neutral';
     }
   },
 
@@ -140,13 +195,13 @@ window.Utils = {
   getPaymentStatusBadgeClass(status) {
     switch (status) {
       case 'Received':
-        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+        return 'badge-green';
       case 'Pending':
-        return 'bg-amber-50 text-amber-700 border-amber-200';
+        return 'badge-amber';
       case 'Refunded':
-        return 'bg-rose-50 text-rose-700 border-rose-200';
+        return 'badge-red';
       default:
-        return 'bg-slate-100 text-slate-700 border-slate-200';
+        return 'badge-neutral';
     }
   },
 
@@ -156,15 +211,15 @@ window.Utils = {
   getSubmissionStatusBadgeClass(status) {
     switch (status) {
       case 'New':
-        return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+        return 'badge-blue';
       case 'Reviewed':
-        return 'bg-blue-50 text-blue-700 border-blue-200';
+        return 'badge-amber';
       case 'Converted':
-        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+        return 'badge-green';
       case 'Spam':
-        return 'bg-rose-50 text-rose-700 border-rose-200';
+        return 'badge-red';
       default:
-        return 'bg-slate-100 text-slate-700 border-slate-200';
+        return 'badge-neutral';
     }
   },
 
@@ -172,9 +227,9 @@ window.Utils = {
    * Task priority badge styling
    */
   getPriorityBadgeClass(priority) {
-    if (priority === 'High') return 'bg-rose-50 text-rose-700 border-rose-200';
-    if (priority === 'Medium') return 'bg-amber-50 text-amber-700 border-amber-200';
-    return 'bg-slate-100 text-slate-600 border-slate-200';
+    if (priority === 'High') return 'badge-red';
+    if (priority === 'Medium') return 'badge-amber';
+    return 'badge-neutral';
   },
 
   /**
@@ -186,23 +241,23 @@ window.Utils = {
 
     const styles = {
       success: {
-        bg: 'bg-slate-900 text-white border-slate-800',
-        iconColor: 'text-emerald-400',
+        cls: 'surface-popover border-[var(--st-green-border)] text-ink',
+        iconCls: 'text-st-green',
         path: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'
       },
       error: {
-        bg: 'bg-rose-600 text-white border-rose-700',
-        iconColor: 'text-rose-100',
+        cls: 'surface-popover border-[var(--st-red-border)] text-ink',
+        iconCls: 'text-st-red',
         path: 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
       },
       warning: {
-        bg: 'bg-amber-600 text-white border-amber-700',
-        iconColor: 'text-amber-100',
+        cls: 'surface-popover border-[var(--st-amber-border)] text-ink',
+        iconCls: 'text-st-amber',
         path: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z'
       },
       info: {
-        bg: 'bg-slate-800 text-white border-slate-700',
-        iconColor: 'text-indigo-300',
+        cls: 'surface-popover border-[var(--border-strong)] text-ink',
+        iconCls: 'text-accent',
         path: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
       }
     };
@@ -210,11 +265,12 @@ window.Utils = {
     const cfg = styles[type] || styles.info;
     const el = document.createElement('div');
     el.setAttribute('role', 'status');
-    el.className = `pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-xl border text-sm font-medium transition-all duration-300 transform translate-y-2 opacity-0 ${cfg.bg}`;
+    el.className = `pointer-events-auto flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] font-medium transition-all duration-200 transform translate-y-2 opacity-0 ${cfg.cls}`;
 
     const svgNS = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(svgNS, 'svg');
-    svg.setAttribute('class', `w-4 h-4 shrink-0 ${cfg.iconColor}`);
+    svg.setAttribute('class', `w-4 h-4 shrink-0 ${cfg.iconCls}`);
+    svg.setAttribute('aria-hidden', 'true');
     svg.setAttribute('fill', 'none');
     svg.setAttribute('stroke', 'currentColor');
     svg.setAttribute('viewBox', '0 0 24 24');
@@ -238,7 +294,7 @@ window.Utils = {
 
     setTimeout(() => {
       el.classList.add('opacity-0', 'translate-y-2');
-      setTimeout(() => el.remove(), 300);
+      setTimeout(() => el.remove(), 220);
     }, 3500);
   }
 };

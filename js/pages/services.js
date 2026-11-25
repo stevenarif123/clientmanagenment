@@ -9,6 +9,7 @@ window.ServicesView = {
   data() {
     return {
       loading: true,
+      error: '',
       services: [],
       showInlineForm: false,
       selectedService: null,
@@ -28,10 +29,12 @@ window.ServicesView = {
   methods: {
     async fetchServices() {
       this.loading = true;
+      this.error = '';
       try {
         const response = await window.API.services.getAll();
         this.services = response.data?.data || [];
       } catch (err) {
+        this.error = 'Failed to load services catalog.';
         window.Utils.toast('Failed to load services', 'error');
       } finally {
         this.loading = false;
@@ -104,142 +107,152 @@ window.ServicesView = {
     }
   },
   template: `
-    <div>
-      <!-- Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-        <div>
-          <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Services Catalog</h1>
-          <p class="text-sm text-slate-500 mt-0.5">Manage your agency service offerings and deliverables</p>
+    <div class="flex flex-col min-h-full">
+      <!-- Slim Top Header -->
+      <div class="min-h-[44px] px-5 sm:px-6 py-2 hairline-b flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-2.5">
+          <h1 class="text-sm font-semibold text-ink tracking-tight">Services Catalog</h1>
+          <span class="text-xs text-muted tabular-nums">{{ services.length }} offerings</span>
         </div>
         <button
+          type="button"
           @click="showInlineForm ? showInlineForm = false : openCreate()"
-          class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-xl shadow-sm transition-colors flex items-center gap-2 self-start sm:self-auto"
+          class="btn-primary text-xs py-1 px-2.5"
         >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
           {{ showInlineForm ? 'Close Form' : 'Add Service' }}
         </button>
       </div>
 
-      <!-- INLINE Service Form Card -->
-      <div v-if="showInlineForm" class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 sm:p-8 mb-8 animate-in">
-        <div class="flex items-center justify-between pb-4 border-b border-slate-100 mb-6">
-          <h2 class="text-base font-bold text-slate-900">{{ selectedService ? 'Edit Service Offering' : 'New Service Offering' }}</h2>
-          <button @click="showInlineForm = false" class="text-xs font-semibold text-slate-500 hover:text-slate-800">
-            Cancel
-          </button>
-        </div>
+      <div class="p-5 sm:p-6 space-y-6">
+        <!-- INLINE Service Form Card -->
+        <div v-if="showInlineForm" class="surface-card p-5 animate-in">
+          <div class="flex items-center justify-between pb-3.5 hairline-b mb-4">
+            <h2 class="text-sm font-semibold text-ink">{{ selectedService ? 'Edit Service Offering' : 'New Service Offering' }}</h2>
+            <button type="button" @click="showInlineForm = false" class="btn-ghost text-xs py-1 px-2">Cancel</button>
+          </div>
 
-        <div v-if="formError" class="mb-5 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-sm rounded-xl">
-          {{ formError }}
-        </div>
+          <div v-if="formError" class="mb-4 p-3 rounded-[6px] border badge-red text-xs">
+            {{ formError }}
+          </div>
 
-        <form @submit.prevent="handleSubmit" class="space-y-5">
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
-            <div class="sm:col-span-2">
-              <label class="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">Service Name *</label>
-              <input
-                v-model="form.name"
-                type="text"
-                required
-                class="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-slate-900 font-medium"
-                placeholder="e.g. Custom Web Application Development"
-              />
+          <form @submit.prevent="handleSubmit" class="space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div class="sm:col-span-2">
+                <label for="service-name" class="field-label">Service Name *</label>
+                <input
+                  id="service-name"
+                  v-model="form.name"
+                  type="text"
+                  required
+                  class="field-input font-medium"
+                  placeholder="Custom Web Application Development"
+                />
+              </div>
+              <div>
+                <label for="service-status" class="field-label">Availability</label>
+                <select id="service-status" v-model="form.is_active" class="field-input">
+                  <option :value="1">Active (Shown in forms)</option>
+                  <option :value="0">Inactive (Hidden)</option>
+                </select>
+              </div>
             </div>
+
             <div>
-              <label class="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">Status</label>
-              <select
-                v-model="form.is_active"
-                class="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-slate-900"
-              >
-                <option :value="1">Active (Available in dropdowns)</option>
-                <option :value="0">Inactive</option>
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">Description &amp; Scope</label>
-            <textarea
-              v-model="form.description"
-              rows="3"
-              class="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-slate-900 leading-relaxed"
-              placeholder="Detail deliverables, features included, SLA, or tech stack..."
-            ></textarea>
-          </div>
-
-          <div class="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
-            <button type="button" @click="showInlineForm = false" class="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Cancel</button>
-            <button type="submit" :disabled="formLoading" class="px-6 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-white text-sm font-semibold rounded-xl shadow-sm flex items-center gap-2">
-              <span v-if="formLoading" class="spinner"></span>
-              {{ selectedService ? 'Save Changes' : 'Create Service' }}
-            </button>
-          </div>
-        </form>
-      </div>
-
-      <!-- Loading State -->
-      <div v-if="loading" class="py-20 flex flex-col items-center justify-center">
-        <div class="spinner spinner-lg text-slate-900"></div>
-        <p class="text-sm text-slate-500 mt-3">Loading services catalog...</p>
-      </div>
-
-      <!-- Empty State -->
-      <div v-else-if="services.length === 0" class="bg-white rounded-2xl border border-slate-200/80 p-12 text-center shadow-sm">
-        <h3 class="text-base font-bold text-slate-900">No services defined yet</h3>
-        <p class="text-sm text-slate-500 mt-1">Create service packages so you can assign them to projects and your contact form.</p>
-        <button @click="openCreate" class="mt-4 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-xl shadow-sm">
-          Add First Service
-        </button>
-      </div>
-
-      <!-- Services Grid -->
-      <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in">
-        <div
-          v-for="s in services"
-          :key="s.id"
-          class="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
-        >
-          <div>
-            <div class="flex items-start justify-between gap-3 mb-2">
-              <h3 class="text-base font-bold text-slate-900">{{ s.name }}</h3>
-              <button
-                type="button"
-                @click="toggleActive(s)"
-                title="Click to toggle status"
-                class="text-[10px] font-bold px-2.5 py-0.5 rounded-full border uppercase shrink-0 transition-colors"
-                :class="s.is_active ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'"
-              >
-                {{ s.is_active ? 'Active' : 'Inactive' }}
-              </button>
+              <label for="service-desc" class="field-label">Description &amp; Scope</label>
+              <textarea
+                id="service-desc"
+                v-model="form.description"
+                rows="3"
+                class="field-input leading-relaxed"
+                placeholder="Deliverables included, timeline assumptions, or stack notes..."
+              ></textarea>
             </div>
 
-            <p class="text-xs text-slate-600 leading-relaxed mt-2">
-              {{ s.description || 'No description provided for this service offering.' }}
-            </p>
+            <div class="pt-3 hairline-t flex items-center justify-end gap-2">
+              <button type="button" @click="showInlineForm = false" class="btn-secondary">Cancel</button>
+              <button type="submit" :disabled="formLoading" class="btn-primary">
+                <span v-if="formLoading" class="spinner" aria-hidden="true"></span>
+                <span>{{ selectedService ? 'Save Changes' : 'Create Service' }}</span>
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Skeleton Loading State -->
+        <div v-if="loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div v-for="n in 6" :key="'srv-sk-' + n" class="surface-card p-5 space-y-3">
+            <div class="skeleton-bar h-4 w-2/3"></div>
+            <div class="skeleton-bar h-3 w-full"></div>
+            <div class="skeleton-bar h-3 w-4/5"></div>
           </div>
+        </div>
 
-          <div class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
-            <span class="text-xs font-semibold text-slate-500">
-              {{ s.project_count || 0 }} projects linked
-            </span>
+        <!-- Error State -->
+        <div v-else-if="error" class="surface-card p-5 border-[var(--st-red-border)] flex items-center justify-between gap-4">
+          <p class="text-sm font-medium text-st-red">{{ error }}</p>
+          <button type="button" @click="fetchServices" class="btn-secondary">Retry</button>
+        </div>
 
-            <div class="flex items-center gap-1">
-              <button
-                @click="openEdit(s)"
-                aria-label="Edit Service"
-                class="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-                title="Edit Service"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
-              </button>
-              <button
-                @click="deleteTarget = s"
-                aria-label="Delete Service"
-                class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                title="Delete Service"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-              </button>
+        <!-- Empty State -->
+        <div v-else-if="services.length === 0" class="surface-card p-10 text-center">
+          <h2 class="text-sm font-semibold text-ink">No services defined yet</h2>
+          <p class="text-xs text-sub mt-1">Create service packages so they populate project forms and your public contact form.</p>
+          <button type="button" @click="openCreate" class="btn-primary mt-4">Add First Service</button>
+        </div>
+
+        <!-- Services Grid -->
+        <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-in">
+          <div
+            v-for="s in services"
+            :key="s.id"
+            class="surface-card p-4 sm:p-5 hover:border-[var(--border-strong)] transition-colors flex flex-col justify-between"
+          >
+            <div>
+              <div class="flex items-start justify-between gap-3 mb-2">
+                <h2 class="text-sm font-semibold text-ink leading-snug">{{ s.name }}</h2>
+                <button
+                  type="button"
+                  @click="toggleActive(s)"
+                  :aria-label="'Toggle status for ' + s.name"
+                  title="Click to toggle status"
+                  class="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-[4px] border shrink-0 transition-colors"
+                  :class="s.is_active ? 'badge-green' : 'badge-neutral'"
+                >
+                  <span class="status-sq" :class="s.is_active ? 'st-green' : 'st-neutral'" aria-hidden="true"></span>
+                  <span>{{ s.is_active ? 'Active' : 'Inactive' }}</span>
+                </button>
+              </div>
+
+              <p class="text-xs text-sub leading-relaxed mt-1.5">
+                {{ s.description || 'No scope description provided.' }}
+              </p>
+            </div>
+
+            <div class="mt-4 pt-3 hairline-t flex items-center justify-between">
+              <span class="text-xs font-medium text-muted tabular-nums">
+                {{ s.project_count || 0 }} projects linked
+              </span>
+
+              <div class="flex items-center gap-1">
+                <button
+                  type="button"
+                  @click="openEdit(s)"
+                  :aria-label="'Edit ' + s.name"
+                  class="btn-ghost p-1.5"
+                  title="Edit Service"
+                >
+                  <svg class="w-3.5 h-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                </button>
+                <button
+                  type="button"
+                  @click="deleteTarget = s"
+                  :aria-label="'Delete ' + s.name"
+                  class="btn-ghost p-1.5 hover:text-st-red"
+                  title="Delete Service"
+                >
+                  <svg class="w-3.5 h-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+              </div>
             </div>
           </div>
         </div>

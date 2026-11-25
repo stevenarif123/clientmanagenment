@@ -1,5 +1,5 @@
 /**
- * Reports View (Financial Analysis & Exports)
+ * Reports View (Financial Analysis, Charts & Exports)
  */
 
 window.ReportsView = {
@@ -11,6 +11,7 @@ window.ReportsView = {
 
     return {
       loading: true,
+      error: '',
       startDate: firstDay,
       endDate: lastDay,
       selectedYear: currentYear,
@@ -37,9 +38,17 @@ window.ReportsView = {
     }
   },
   async mounted() {
+    this._onThemeChange = async () => {
+      if (!this.loading && !this.error) {
+        await this.$nextTick();
+        this.renderChart();
+      }
+    };
+    window.addEventListener('clienthub-theme-change', this._onThemeChange);
     await this.fetchReports();
   },
   beforeUnmount() {
+    window.removeEventListener('clienthub-theme-change', this._onThemeChange);
     if (this.chartInstance) {
       this.chartInstance.destroy();
     }
@@ -68,6 +77,7 @@ window.ReportsView = {
     },
     async fetchReports() {
       this.loading = true;
+      this.error = '';
       let loaded = false;
       try {
         const [finRes, budRes] = await Promise.all([
@@ -78,6 +88,7 @@ window.ReportsView = {
         this.budgetOverview = budRes.data?.data || this.budgetOverview;
         loaded = true;
       } catch (err) {
+        this.error = 'Failed to compile financial report data.';
         window.Utils.toast('Failed to load financial reports', 'error');
       } finally {
         this.loading = false;
@@ -99,6 +110,10 @@ window.ReportsView = {
       const categories = this.budgetOverview.expenses_by_category || [];
       if (categories.length === 0) return;
 
+      const isDark = window.Utils.getTheme() === 'dark';
+      const legendColor = isDark ? '#b4bcc8' : '#4b5563';
+      const canvasBg = isDark ? '#141820' : '#ffffff';
+
       const labels = categories.map(c => c.category);
       const data = categories.map(c => Number(c.total));
 
@@ -109,10 +124,10 @@ window.ReportsView = {
           datasets: [{
             data,
             backgroundColor: [
-              '#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#8b5cf6', '#64748b'
+              '#2563eb', '#16a34a', '#d97706', '#dc2626', '#0891b2', '#64748b', '#475569'
             ],
             borderWidth: 2,
-            borderColor: '#ffffff'
+            borderColor: canvasBg
           }]
         },
         options: {
@@ -122,7 +137,12 @@ window.ReportsView = {
           plugins: {
             legend: {
               position: 'bottom',
-              labels: { boxWidth: 10, padding: 12, font: { size: 11, family: 'Inter, sans-serif' } }
+              labels: {
+                boxWidth: 10,
+                padding: 12,
+                color: legendColor,
+                font: { size: 11, family: 'Public Sans, sans-serif' }
+              }
             },
             tooltip: {
               callbacks: {
@@ -206,7 +226,7 @@ window.ReportsView = {
         link.click();
         link.remove();
         window.URL.revokeObjectURL(link.href);
-        window.Utils.toast('Database backup downloaded successfully!', 'success');
+        window.Utils.toast('Database backup downloaded successfully', 'success');
       } catch (err) {
         window.Utils.toast('Failed to download database backup', 'error');
       }
@@ -216,196 +236,165 @@ window.ReportsView = {
     }
   },
   template: `
-    <div>
-      <!-- Header -->
-      <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-8">
-        <div>
-          <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Reports &amp; Financials</h1>
-          <p class="text-sm text-slate-500 mt-0.5">Analyze financial statements, category expenses, and export records</p>
+    <div class="flex flex-col min-h-full">
+      <!-- Slim Header -->
+      <div class="min-h-[44px] px-5 sm:px-6 py-2 hairline-b flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-2.5">
+          <h1 class="text-sm font-semibold text-ink tracking-tight">Reports &amp; Financials</h1>
+          <span class="text-xs text-muted hidden sm:inline">Cashflow, category expenses &amp; SQLite exports</span>
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
-          <button
-            @click="downloadDatabaseBackup"
-            class="px-3.5 py-2 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 text-emerald-800 text-xs font-semibold rounded-xl shadow-sm flex items-center gap-1.5 transition-colors"
-            title="Download full SQLite database copy"
-          >
-            <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-            Backup Database
+          <button type="button" @click="downloadDatabaseBackup" class="btn-secondary text-xs py-1 px-2.5" title="Download full SQLite database copy">
+            Backup DB
           </button>
-          <button
-            @click="exportCSV('clients')"
-            class="px-3.5 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl shadow-sm flex items-center gap-1.5 transition-colors"
-          >
-            <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          <button type="button" @click="exportCSV('clients')" class="btn-secondary text-xs py-1 px-2.5">
             Clients CSV
           </button>
-          <button
-            @click="exportCSV('projects')"
-            class="px-3.5 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl shadow-sm flex items-center gap-1.5 transition-colors"
-          >
-            <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          <button type="button" @click="exportCSV('projects')" class="btn-secondary text-xs py-1 px-2.5">
             Financial CSV
           </button>
-          <button
-            @click="exportPDF"
-            class="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl shadow-sm flex items-center gap-1.5 transition-colors"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+          <button type="button" @click="exportPDF" class="btn-primary text-xs py-1 px-2.5">
             Print / PDF
           </button>
         </div>
       </div>
 
-      <!-- Date Range Filter Bar -->
-      <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm mb-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div class="flex flex-wrap items-center gap-3">
-          <div class="flex items-center gap-2">
-            <span class="text-xs font-semibold text-slate-500 uppercase">From</span>
-            <input
-              v-model="startDate"
-              type="date"
-              class="px-3 py-1.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-            />
+      <!-- Date Range Filter Strip -->
+      <div class="px-5 sm:px-6 py-3 hairline-b surface-subtle flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        <div class="flex flex-wrap items-center gap-2.5">
+          <div class="flex items-center gap-1.5">
+            <label for="rep-start" class="text-xs font-medium text-sub">From</label>
+            <input id="rep-start" v-model="startDate" type="date" class="field-input w-auto py-1 px-2.5 text-xs" />
           </div>
-          <div class="flex items-center gap-2">
-            <span class="text-xs font-semibold text-slate-500 uppercase">To</span>
-            <input
-              v-model="endDate"
-              type="date"
-              class="px-3 py-1.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-            />
+          <div class="flex items-center gap-1.5">
+            <label for="rep-end" class="text-xs font-medium text-sub">To</label>
+            <input id="rep-end" v-model="endDate" type="date" class="field-input w-auto py-1 px-2.5 text-xs" />
           </div>
-          <div class="flex items-center gap-2">
-            <span class="text-xs font-semibold text-slate-500 uppercase">Year</span>
-            <select
-              v-model.number="selectedYear"
-              class="px-3 py-1.5 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-            >
+          <div class="flex items-center gap-1.5">
+            <label for="rep-year" class="text-xs font-medium text-sub">Year</label>
+            <select id="rep-year" v-model.number="selectedYear" class="field-input w-auto py-1 px-2.5 text-xs font-medium">
               <option v-for="y in availableYears" :key="y" :value="y">{{ y }}</option>
             </select>
           </div>
-          <button
-            @click="fetchReports"
-            class="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl shadow-sm"
-          >
-            Apply Filter
+          <button type="button" @click="fetchReports" class="btn-primary text-xs py-1 px-3">
+            Apply
           </button>
         </div>
 
         <div class="flex flex-wrap items-center gap-1.5">
-          <button @click="setPeriod('this_month')" class="px-3 py-1.5 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">This Month</button>
-          <button @click="setPeriod('last_month')" class="px-3 py-1.5 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">Last Month</button>
-          <button @click="setPeriod('this_year')" class="px-3 py-1.5 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">Year to Date</button>
+          <button type="button" @click="setPeriod('this_month')" class="btn-secondary text-xs py-1 px-2.5">This Month</button>
+          <button type="button" @click="setPeriod('last_month')" class="btn-secondary text-xs py-1 px-2.5">Last Month</button>
+          <button type="button" @click="setPeriod('this_year')" class="btn-secondary text-xs py-1 px-2.5">Year to Date</button>
         </div>
       </div>
 
-      <!-- Loading State -->
-      <div v-if="loading" class="py-20 flex flex-col items-center justify-center">
-        <div class="spinner spinner-lg text-slate-900"></div>
-        <p class="text-sm text-slate-500 mt-3">Compiling financial report...</p>
-      </div>
-
-      <div v-else class="space-y-7 animate-in">
-        <!-- 4 Metric Cards -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
-            <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Period Revenue</p>
-            <p class="text-2xl font-bold text-emerald-600 mt-1 tabular-nums">{{ formatCurrency(financialData.total_revenue) }}</p>
+      <div class="p-5 sm:p-6 space-y-6">
+        <!-- Skeleton Loading -->
+        <div v-if="loading" class="space-y-5">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            <div v-for="n in 4" :key="'rep-sk-' + n" class="surface-card p-4 space-y-2"><div class="skeleton-bar h-3 w-24"></div><div class="skeleton-bar h-6 w-28"></div></div>
           </div>
-          <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
-            <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Period Expenses</p>
-            <p class="text-2xl font-bold text-rose-600 mt-1 tabular-nums">{{ formatCurrency(financialData.total_expenses) }}</p>
-          </div>
-          <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
-            <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Net Profit</p>
-            <p class="text-2xl font-bold mt-1 tabular-nums" :class="profit >= 0 ? 'text-slate-900' : 'text-rose-600'">
-              {{ formatCurrency(profit) }}
-            </p>
-          </div>
-          <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
-            <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Completed Projects</p>
-            <p class="text-2xl font-bold text-indigo-600 mt-1 tabular-nums">{{ financialData.completed_projects }}</p>
-          </div>
+          <div class="surface-card p-5 h-60"><div class="skeleton-bar h-full w-full"></div></div>
         </div>
 
-        <!-- Visual Analytics Grid -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div class="lg:col-span-1 bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm flex flex-col">
-            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">Expense Distribution</h3>
-            <div v-if="!budgetOverview.expenses_by_category || budgetOverview.expenses_by_category.length === 0" class="flex-1 py-12 text-center text-xs text-slate-400 flex items-center justify-center">
-              No expenses recorded for {{ budgetOverview.year }}.
+        <!-- Error State -->
+        <div v-else-if="error" class="surface-card p-5 border-[var(--st-red-border)] flex items-center justify-between gap-4">
+          <p class="text-sm font-medium text-st-red">{{ error }}</p>
+          <button type="button" @click="fetchReports" class="btn-secondary">Retry</button>
+        </div>
+
+        <div v-else class="space-y-6 animate-in">
+          <!-- 4 Metric Tiles -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            <div class="surface-card p-4">
+              <p class="text-xs font-medium text-muted">Period Revenue</p>
+              <p class="text-xl font-bold text-st-green mt-1 tabular-nums">{{ formatCurrency(financialData.total_revenue) }}</p>
             </div>
-            <div v-else class="relative w-full h-64 flex items-center justify-center">
-              <canvas id="categoryExpenseChart"></canvas>
+            <div class="surface-card p-4">
+              <p class="text-xs font-medium text-muted">Period Expenses</p>
+              <p class="text-xl font-bold text-st-red mt-1 tabular-nums">{{ formatCurrency(financialData.total_expenses) }}</p>
+            </div>
+            <div class="surface-card p-4">
+              <p class="text-xs font-medium text-muted">Net Profit</p>
+              <p class="text-xl font-bold mt-1 tabular-nums" :class="profit >= 0 ? 'text-ink' : 'text-st-red'">
+                {{ formatCurrency(profit) }}
+              </p>
+            </div>
+            <div class="surface-card p-4">
+              <p class="text-xs font-medium text-muted">Completed Projects</p>
+              <p class="text-xl font-bold text-accent mt-1 tabular-nums">{{ financialData.completed_projects }}</p>
             </div>
           </div>
 
-          <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm">
-            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">Annual Breakdown by Category ({{ budgetOverview.year }})</h3>
-            <div v-if="!budgetOverview.expenses_by_category || budgetOverview.expenses_by_category.length === 0" class="py-12 text-center text-sm text-slate-400">
-              No categorized expenses recorded in {{ budgetOverview.year }}.
+          <!-- Visual Analytics Grid -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div class="lg:col-span-1 surface-card p-5 flex flex-col">
+              <h2 class="section-heading mb-4">Expense Distribution</h2>
+              <div v-if="!budgetOverview.expenses_by_category || budgetOverview.expenses_by_category.length === 0" class="flex-1 py-10 text-center text-xs text-muted flex items-center justify-center">
+                No expenses recorded for {{ budgetOverview.year }}.
+              </div>
+              <div v-else class="relative w-full h-60 flex items-center justify-center">
+                <canvas id="categoryExpenseChart"></canvas>
+              </div>
             </div>
-            <div v-else class="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              <div
-                v-for="cat in budgetOverview.expenses_by_category"
-                :key="cat.category"
-                class="p-4 bg-slate-50 rounded-xl border border-slate-200/60"
-              >
-                <p class="text-xs font-semibold text-slate-500 uppercase">{{ cat.category }}</p>
-                <p class="text-base font-bold text-slate-900 mt-1 tabular-nums">{{ formatCurrency(cat.total) }}</p>
+
+            <div class="lg:col-span-2 surface-card p-5">
+              <h2 class="section-heading mb-4">Annual Breakdown by Category ({{ budgetOverview.year }})</h2>
+              <div v-if="!budgetOverview.expenses_by_category || budgetOverview.expenses_by_category.length === 0" class="py-10 text-center text-xs text-muted">
+                No categorized expenses recorded in {{ budgetOverview.year }}.
+              </div>
+              <div v-else class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div
+                  v-for="cat in budgetOverview.expenses_by_category"
+                  :key="cat.category"
+                  class="p-3.5 surface-subtle rounded-[6px] border hairline"
+                >
+                  <p class="text-xs font-medium text-sub">{{ cat.category }}</p>
+                  <p class="text-sm font-bold text-ink mt-1 tabular-nums">{{ formatCurrency(cat.total) }}</p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- Project Financial Breakdown Table -->
-        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-          <div class="p-6 border-b border-slate-100">
-            <h2 class="text-base font-bold text-slate-900">Project Financial Breakdown</h2>
-            <p class="text-xs text-slate-500 mt-0.5">Projects with transactions in the selected date range</p>
-          </div>
+          <!-- Project Financial Breakdown Table -->
+          <div class="surface-card overflow-hidden">
+            <div class="px-5 py-3.5 hairline-b">
+              <h2 class="section-heading">Project Financial Breakdown</h2>
+              <p class="text-xs text-muted mt-0.5">Projects with transactions inside the selected date window</p>
+            </div>
 
-          <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse">
-              <thead>
-                <tr class="border-b border-slate-100 bg-slate-50/75 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  <th class="py-3.5 px-6">Project</th>
-                  <th class="py-3.5 px-6">Client</th>
-                  <th class="py-3.5 px-6 text-right">Revenue Received</th>
-                  <th class="py-3.5 px-6 text-right">Expenses Paid</th>
-                  <th class="py-3.5 px-6 text-right">Net Margin</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-100 text-sm">
-                <tr v-if="financialData.projects.length === 0">
-                  <td colspan="5" class="py-8 text-center text-slate-400">
-                    No project financial activity in this period.
-                  </td>
-                </tr>
-                <tr
-                  v-for="p in financialData.projects"
-                  :key="p.id"
-                  class="hover:bg-slate-50 transition-colors"
-                >
-                  <td class="py-4 px-6 font-semibold text-slate-900">
-                    <a :href="'#/projects/' + p.id" class="hover:text-indigo-600 hover:underline">{{ p.title }}</a>
-                  </td>
-                  <td class="py-4 px-6 text-slate-600">
-                    {{ p.client_name }}
-                  </td>
-                  <td class="py-4 px-6 text-right font-bold text-emerald-600 tabular-nums">
-                    {{ formatCurrency(p.total_received) }}
-                  </td>
-                  <td class="py-4 px-6 text-right font-semibold text-rose-600 tabular-nums">
-                    {{ formatCurrency(p.total_expenses) }}
-                  </td>
-                  <td class="py-4 px-6 text-right font-bold tabular-nums" :class="(p.total_received - p.total_expenses) >= 0 ? 'text-slate-900' : 'text-rose-600'">
-                    {{ formatCurrency(p.total_received - p.total_expenses) }}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="hairline-b surface-subtle text-xs font-semibold text-sub">
+                    <th class="py-2.5 px-5">Project</th>
+                    <th class="py-2.5 px-5">Client</th>
+                    <th class="py-2.5 px-5 text-right">Revenue Received</th>
+                    <th class="py-2.5 px-5 text-right">Expenses Paid</th>
+                    <th class="py-2.5 px-5 text-right">Net Margin</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-hairline text-[13px]">
+                  <tr v-if="financialData.projects.length === 0">
+                    <td colspan="5" class="py-8 text-center text-xs text-muted">
+                      No project financial activity in this period. Adjust dates or click Year to Date.
+                    </td>
+                  </tr>
+                  <tr v-for="p in financialData.projects" :key="p.id" class="row-hover">
+                    <td class="py-3 px-5 font-semibold text-ink">
+                      <a :href="'#/projects/' + p.id" class="hover:text-accent hover:underline">{{ p.title }}</a>
+                    </td>
+                    <td class="py-3 px-5 text-sub">{{ p.client_name }}</td>
+                    <td class="py-3 px-5 text-right font-semibold text-st-green tabular-nums">{{ formatCurrency(p.total_received) }}</td>
+                    <td class="py-3 px-5 text-right font-semibold text-st-red tabular-nums">{{ formatCurrency(p.total_expenses) }}</td>
+                    <td class="py-3 px-5 text-right font-bold tabular-nums" :class="(p.total_received - p.total_expenses) >= 0 ? 'text-ink' : 'text-st-red'">
+                      {{ formatCurrency(p.total_received - p.total_expenses) }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>

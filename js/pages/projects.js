@@ -1,5 +1,5 @@
 /**
- * Projects Views (List, Detail, and Full-Page Form with Tasks, Kanban & Client Portal)
+ * Projects Views (List, Full-Page Form, and Detail with Inline Kanban/List, Payments, Expenses, Comms & Files)
  */
 
 // 1. Projects List View
@@ -11,6 +11,7 @@ window.ProjectsView = {
   data() {
     return {
       loading: true,
+      error: '',
       projects: [],
       total: 0,
       page: 1,
@@ -31,6 +32,7 @@ window.ProjectsView = {
   methods: {
     async fetchProjects() {
       this.loading = true;
+      this.error = '';
       try {
         const response = await window.API.projects.getAll({
           page: this.page,
@@ -41,6 +43,7 @@ window.ProjectsView = {
         this.projects = response.data?.data || [];
         this.total = response.data?.meta?.total ?? this.projects.length;
       } catch (err) {
+        this.error = 'Failed to load projects list.';
         window.Utils.toast('Failed to load projects', 'error');
       } finally {
         this.loading = false;
@@ -57,18 +60,13 @@ window.ProjectsView = {
       this.page = newPage;
       this.fetchProjects();
     },
-    goToDetail(id) {
-      window.location.hash = '#/projects/' + id;
-    },
     goToCreate() {
       window.location.hash = '#/projects/new';
     },
-    goToEdit(project, event) {
-      if (event) event.stopPropagation();
+    goToEdit(project) {
       window.location.hash = '#/projects/' + project.id + '/edit';
     },
-    confirmDelete(project, event) {
-      if (event) event.stopPropagation();
+    confirmDelete(project) {
       this.deleteProjectTarget = project;
     },
     async executeDelete() {
@@ -90,177 +88,184 @@ window.ProjectsView = {
     },
     getStatusBadgeClass(status) {
       return window.Utils.getStatusBadgeClass(status);
+    },
+    getStatusDotClass(status) {
+      return window.Utils.getStatusDotClass(status);
     }
   },
   template: `
-    <div>
-      <!-- Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-        <div>
-          <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Projects</h1>
-          <p class="text-sm text-slate-500 mt-0.5">Track deliverables, timelines, tasks, budgets, and client portals</p>
+    <div class="flex flex-col min-h-full">
+      <!-- Slim Top Header -->
+      <div class="min-h-[44px] px-5 sm:px-6 py-2 hairline-b flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-2.5">
+          <h1 class="text-sm font-semibold text-ink tracking-tight">Projects</h1>
+          <span class="text-xs text-muted tabular-nums">{{ total }} total</span>
         </div>
-        <button
-          @click="goToCreate"
-          class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-xl shadow-sm transition-colors flex items-center gap-2 self-start sm:self-auto"
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        <button type="button" @click="goToCreate" class="btn-primary text-xs py-1 px-2.5">
           New Project
         </button>
       </div>
 
-      <!-- Filters & Search -->
-      <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div class="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+      <!-- Filter Strip -->
+      <div class="px-5 sm:px-6 py-3 hairline-b surface-subtle flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
           <div class="relative w-full sm:w-72">
-            <svg class="w-4 h-4 text-slate-400 absolute left-3.5 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-3.5 h-3.5 text-muted absolute left-2.5 top-1/2 -translate-y-1/2" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
             </svg>
             <input
               v-model="search"
               @input="handleSearch"
               type="text"
+              aria-label="Search projects or clients"
               placeholder="Search projects or clients..."
-              class="w-full pl-10 pr-4 py-2 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-slate-900"
+              class="field-input pl-8 py-1.5 text-xs"
             />
           </div>
 
           <select
             v-model="statusFilter"
             @change="page = 1; fetchProjects();"
-            class="w-full sm:w-44 px-3 py-2 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-slate-900"
+            aria-label="Filter projects by status"
+            class="field-input w-full sm:w-44 py-1.5 text-xs font-medium"
           >
             <option value="">All Statuses</option>
             <option v-for="s in statuses" :key="s" :value="s">{{ s }}</option>
           </select>
         </div>
 
-        <div class="text-xs text-slate-500 font-medium">
+        <span class="text-xs text-muted tabular-nums">
           Showing {{ projects.length }} of {{ total }} projects
-        </div>
+        </span>
       </div>
 
-      <!-- Loading State -->
-      <div v-if="loading" class="py-20 flex flex-col items-center justify-center">
-        <div class="spinner spinner-lg text-slate-900"></div>
-        <p class="text-sm text-slate-500 mt-3">Loading projects...</p>
-      </div>
-
-      <!-- Empty State -->
-      <div v-else-if="projects.length === 0" class="bg-white rounded-2xl border border-slate-200/80 p-12 text-center shadow-sm">
-        <div class="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
-        </div>
-        <h3 class="text-base font-bold text-slate-900">No projects found</h3>
-        <p class="text-sm text-slate-500 mt-1">Start a new project or change your filters.</p>
-        <button
-          @click="goToCreate"
-          class="mt-4 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-xl shadow-sm"
-        >
-          Create Project
-        </button>
-      </div>
-
-      <!-- Projects Grid -->
-      <div v-else class="space-y-6 animate-in">
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div
-            v-for="p in projects"
-            :key="p.id"
-            @click="goToDetail(p.id)"
-            class="bg-white rounded-2xl border border-slate-200/80 hover:border-slate-300 hover:shadow-md transition-all p-6 cursor-pointer flex flex-col justify-between"
-          >
-            <div>
-              <div class="flex items-start justify-between gap-3 mb-3">
-                <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full border" :class="getStatusBadgeClass(p.status)">
-                  {{ p.status }}
-                </span>
-                <div class="flex items-center gap-1" @click.stop>
-                  <span class="text-xs font-semibold text-slate-400 mr-1">#{{ p.id }}</span>
-                  <button
-                    @click="goToEdit(p, $event)"
-                    aria-label="Edit Project"
-                    class="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-                  >
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
-                  </button>
-                  <button
-                    @click="confirmDelete(p, $event)"
-                    aria-label="Delete Project"
-                    class="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                  >
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                  </button>
-                </div>
-              </div>
-
-              <h3 class="text-base font-bold text-slate-900 leading-snug line-clamp-1">{{ p.title }}</h3>
-              <p class="text-xs font-medium text-slate-500 mt-1 truncate">
-                {{ p.client_name || 'Client' }} &bull; {{ p.service_name || 'Service' }}
-              </p>
-
-              <p v-if="p.description" class="text-xs text-slate-600 mt-3 line-clamp-2 leading-relaxed">
-                {{ p.description }}
-              </p>
-            </div>
-
-            <div class="mt-5 pt-4 border-t border-slate-100 space-y-3">
-              <!-- Work Execution Progress Bar -->
-              <div>
-                <div class="flex items-center justify-between text-xs mb-1">
-                  <span class="text-slate-500 font-medium">Tasks Progress</span>
-                  <span class="font-bold text-slate-900 tabular-nums">
-                    {{ p.task_completed || 0 }}/{{ p.task_total || 0 }} ({{ p.task_progress || 0 }}%)
-                  </span>
-                </div>
-                <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                  <div
-                    class="h-full bg-indigo-600 rounded-full transition-all duration-500"
-                    :style="{ width: (p.task_progress || 0) + '%' }"
-                  ></div>
-                </div>
-              </div>
-
-              <!-- Payment Progress Bar -->
-              <div>
-                <div class="flex items-center justify-between text-xs mb-1">
-                  <span class="text-slate-500 font-medium">Payment Collected</span>
-                  <span class="font-bold text-emerald-700 tabular-nums">
-                    {{ p.total_budget > 0 ? Math.round((p.total_received / p.total_budget) * 100) : 0 }}%
-                  </span>
-                </div>
-                <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                  <div
-                    class="h-full bg-emerald-500 rounded-full transition-all duration-500"
-                    :style="{ width: (p.total_budget > 0 ? Math.min(100, (p.total_received / p.total_budget) * 100) : 0) + '%' }"
-                  ></div>
-                </div>
-              </div>
-
-              <div class="flex items-center justify-between pt-1">
-                <div>
-                  <p class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Budget</p>
-                  <p class="text-sm font-bold text-slate-900 tabular-nums">{{ formatCurrency(p.total_budget) }}</p>
-                </div>
-                <div class="text-right">
-                  <p class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Collected</p>
-                  <p class="text-sm font-bold text-emerald-600 tabular-nums">{{ formatCurrency(p.total_received) }}</p>
-                </div>
-              </div>
-            </div>
+      <div class="p-5 sm:p-6">
+        <!-- Skeleton Loading -->
+        <div v-if="loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div v-for="n in 6" :key="'prj-sk-' + n" class="surface-card p-5 space-y-3">
+            <div class="skeleton-bar h-4 w-24"></div>
+            <div class="skeleton-bar h-5 w-3/4"></div>
+            <div class="skeleton-bar h-3 w-1/2"></div>
+            <div class="skeleton-bar h-2 w-full mt-4"></div>
           </div>
         </div>
 
-        <!-- Pagination -->
-        <pagination
-          :page="page"
-          :total="total"
-          :per-page="perPage"
-          @change="handlePageChange"
-        />
+        <!-- Error State -->
+        <div v-else-if="error" class="surface-card p-5 border-[var(--st-red-border)] flex items-center justify-between gap-4">
+          <p class="text-sm font-medium text-st-red">{{ error }}</p>
+          <button type="button" @click="fetchProjects" class="btn-secondary">Retry</button>
+        </div>
+
+        <!-- Empty State -->
+        <div v-else-if="projects.length === 0" class="surface-card p-10 text-center">
+          <h2 class="text-sm font-semibold text-ink">No projects found</h2>
+          <p class="text-xs text-sub mt-1">
+            {{ (search || statusFilter) ? 'Adjust your search term or status filter.' : 'Create a project to start tracking deliverables, tasks, and invoices.' }}
+          </p>
+          <button type="button" @click="goToCreate" class="btn-primary mt-4">Create Project</button>
+        </div>
+
+        <!-- Projects Grid -->
+        <div v-else class="space-y-5 animate-in">
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <article
+              v-for="p in projects"
+              :key="p.id"
+              class="surface-card hover:border-[var(--border-strong)] transition-colors p-5 flex flex-col justify-between"
+            >
+              <div>
+                <div class="flex items-center justify-between gap-2 mb-3">
+                  <span class="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-[4px] border" :class="getStatusBadgeClass(p.status)">
+                    <span class="status-sq" :class="getStatusDotClass(p.status)" aria-hidden="true"></span>
+                    <span>{{ p.status }}</span>
+                  </span>
+                  <div class="flex items-center gap-1">
+                    <span class="text-[11px] font-medium text-muted mr-1 tabular-nums">#{{ p.id }}</span>
+                    <button
+                      type="button"
+                      @click="goToEdit(p)"
+                      :aria-label="'Edit ' + p.title"
+                      class="btn-ghost p-1"
+                    >
+                      <svg class="w-3.5 h-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                    </button>
+                    <button
+                      type="button"
+                      @click="confirmDelete(p)"
+                      :aria-label="'Delete ' + p.title"
+                      class="btn-ghost p-1 hover:text-st-red"
+                    >
+                      <svg class="w-3.5 h-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    </button>
+                  </div>
+                </div>
+
+                <h2 class="text-[15px] font-semibold leading-snug line-clamp-1">
+                  <a :href="'#/projects/' + p.id" class="text-ink hover:text-accent hover:underline">{{ p.title }}</a>
+                </h2>
+                <p class="text-xs font-medium text-sub mt-1 truncate">
+                  {{ p.client_name || 'Client' }} &bull; {{ p.service_name || 'Service' }}
+                </p>
+
+                <p v-if="p.description" class="text-xs text-muted mt-2.5 line-clamp-2 leading-relaxed">
+                  {{ p.description }}
+                </p>
+              </div>
+
+              <div class="mt-4 pt-3.5 hairline-t space-y-2.5">
+                <div>
+                  <div class="flex items-center justify-between text-xs mb-1">
+                    <span class="text-muted">Tasks</span>
+                    <span class="font-semibold text-ink tabular-nums">
+                      {{ p.task_completed || 0 }}/{{ p.task_total || 0 }} ({{ p.task_progress || 0 }}%)
+                    </span>
+                  </div>
+                  <div class="w-full h-1.5 surface-subtle rounded-full overflow-hidden">
+                    <div
+                      class="h-full bg-[#2563eb] rounded-full transition-all duration-300"
+                      :style="{ width: (p.task_progress || 0) + '%' }"
+                    ></div>
+                  </div>
+                </div>
+
+                <div>
+                  <div class="flex items-center justify-between text-xs mb-1">
+                    <span class="text-muted">Collected</span>
+                    <span class="font-semibold text-st-green tabular-nums">
+                      {{ p.total_budget > 0 ? Math.round((p.total_received / p.total_budget) * 100) : 0 }}%
+                    </span>
+                  </div>
+                  <div class="w-full h-1.5 surface-subtle rounded-full overflow-hidden">
+                    <div
+                      class="h-full bg-[#16a34a] rounded-full transition-all duration-300"
+                      :style="{ width: (p.total_budget > 0 ? Math.min(100, (p.total_received / p.total_budget) * 100) : 0) + '%' }"
+                    ></div>
+                  </div>
+                </div>
+
+                <div class="flex items-center justify-between pt-1 text-xs">
+                  <div>
+                    <span class="text-muted block">Budget</span>
+                    <span class="font-semibold text-ink tabular-nums">{{ formatCurrency(p.total_budget) }}</span>
+                  </div>
+                  <div class="text-right">
+                    <span class="text-muted block">Received</span>
+                    <span class="font-semibold text-st-green tabular-nums">{{ formatCurrency(p.total_received) }}</span>
+                  </div>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <pagination
+            :page="page"
+            :total="total"
+            :per-page="perPage"
+            @change="handlePageChange"
+          />
+        </div>
       </div>
 
-      <!-- Delete Confirmation -->
       <confirm-modal
         v-if="deleteProjectTarget"
         title="Delete Project"
@@ -391,159 +396,104 @@ window.ProjectFormView = {
     }
   },
   template: `
-    <div class="max-w-3xl mx-auto">
-      <!-- Breadcrumb -->
-      <div class="flex items-center gap-2 text-sm text-slate-500 mb-6">
-        <a href="#/projects" class="hover:text-slate-900 transition-colors">Projects</a>
-        <span>/</span>
-        <span class="font-medium text-slate-900">{{ isEdit ? 'Edit Project' : 'New Project' }}</span>
+    <div class="flex flex-col min-h-full">
+      <div class="min-h-[44px] px-5 sm:px-6 py-2 hairline-b flex items-center justify-between gap-3">
+        <div class="flex items-center gap-2 text-xs text-sub">
+          <a href="#/projects" class="hover:text-ink">Projects</a>
+          <span class="text-muted">/</span>
+          <span class="font-semibold text-ink">{{ isEdit ? 'Edit Project' : 'New Project' }}</span>
+        </div>
+        <button type="button" @click="handleCancel" class="btn-secondary text-xs py-1 px-2.5">Cancel</button>
       </div>
 
-      <!-- Main Form Card -->
-      <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-        <div class="p-6 sm:p-8 border-b border-slate-100 flex items-center justify-between">
-          <div>
-            <h1 class="text-xl font-bold text-slate-900">{{ isEdit ? 'Edit Project Details' : 'Create New Project' }}</h1>
-            <p class="text-xs text-slate-500 mt-1">Configure project specifications, timeline, and contract value.</p>
+      <div class="p-5 sm:p-6 max-w-3xl w-full mx-auto">
+        <div class="surface-card overflow-hidden">
+          <div class="px-5 py-4 hairline-b">
+            <h1 class="text-base font-bold text-ink">{{ isEdit ? 'Edit Project Details' : 'Create New Project' }}</h1>
+            <p class="text-xs text-muted mt-0.5">Configure scope, timeline, assigned client, and contract budget.</p>
           </div>
-          <button
-            type="button"
-            @click="handleCancel"
-            class="px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-          >
-            Cancel
-          </button>
+
+          <div v-if="loading" class="p-6 space-y-4">
+            <div class="skeleton-bar h-9 w-full"></div>
+            <div class="skeleton-bar h-9 w-full"></div>
+          </div>
+
+          <form v-else @submit.prevent="handleSubmit" class="p-5 sm:p-6 space-y-5">
+            <div v-if="error" class="p-3 rounded-[6px] border badge-red text-[13px]">
+              {{ error }}
+            </div>
+
+            <div>
+              <label for="proj-title" class="field-label">Project Title *</label>
+              <input id="proj-title" v-model="form.title" type="text" required placeholder="Company Website Redesign & CMS" class="field-input font-medium" />
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label for="proj-client" class="field-label">Client *</label>
+                <select id="proj-client" v-model.number="form.client_id" required class="field-input">
+                  <option value="" disabled>Select Client</option>
+                  <option v-for="c in clients" :key="c.id" :value="c.id">
+                    {{ c.name }} {{ c.company ? '(' + c.company + ')' : '' }}
+                  </option>
+                </select>
+              </div>
+
+              <div>
+                <label for="proj-service" class="field-label">Service Package *</label>
+                <select id="proj-service" v-model.number="form.service_id" required class="field-input">
+                  <option value="" disabled>Select Service Package</option>
+                  <option v-for="s in services" :key="s.id" :value="s.id">{{ s.name }}</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label for="proj-status" class="field-label">Project Status</label>
+                <select id="proj-status" v-model="form.status" class="field-input">
+                  <option v-for="s in statuses" :key="s" :value="s">{{ s }}</option>
+                </select>
+              </div>
+
+              <div>
+                <label for="proj-budget" class="field-label">Total Contract Budget (IDR) *</label>
+                <input id="proj-budget" v-model.number="form.total_budget" type="number" min="0" step="50000" required class="field-input tabular-nums font-semibold" />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label for="proj-start" class="field-label">Start Date</label>
+                <input id="proj-start" v-model="form.start_date" type="date" class="field-input" />
+              </div>
+
+              <div>
+                <label for="proj-end" class="field-label">Target End Date</label>
+                <input id="proj-end" v-model="form.end_date" type="date" class="field-input" />
+              </div>
+            </div>
+
+            <div>
+              <label for="proj-desc" class="field-label">Project Description &amp; Scope</label>
+              <textarea
+                id="proj-desc"
+                v-model="form.description"
+                rows="4"
+                placeholder="Scope of work, deliverables, client requirements, milestones..."
+                class="field-input leading-relaxed"
+              ></textarea>
+            </div>
+
+            <div class="pt-4 hairline-t flex items-center justify-end gap-2">
+              <button type="button" @click="handleCancel" class="btn-secondary">Cancel</button>
+              <button type="submit" :disabled="saving" class="btn-primary">
+                <span v-if="saving" class="spinner" aria-hidden="true"></span>
+                <span>{{ isEdit ? 'Save Changes' : 'Create Project' }}</span>
+              </button>
+            </div>
+          </form>
         </div>
-
-        <div v-if="loading" class="p-12 text-center">
-          <div class="spinner spinner-lg text-slate-900 mx-auto"></div>
-          <p class="text-sm text-slate-500 mt-3">Loading project data...</p>
-        </div>
-
-        <form v-else @submit.prevent="handleSubmit" class="p-6 sm:p-8 space-y-6">
-          <div v-if="error" class="p-4 bg-rose-50 border border-rose-200 text-rose-700 text-sm rounded-xl">
-            {{ error }}
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
-              Project Title <span class="text-rose-500">*</span>
-            </label>
-            <input
-              v-model="form.title"
-              type="text"
-              required
-              placeholder="e.g. E-Commerce Redesign & Payment Gateway"
-              class="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-slate-900 transition-all font-medium"
-            />
-          </div>
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            <div>
-              <label class="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
-                Client <span class="text-rose-500">*</span>
-              </label>
-              <select
-                v-model.number="form.client_id"
-                required
-                class="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-slate-900 transition-all"
-              >
-                <option value="" disabled>Select Client</option>
-                <option v-for="c in clients" :key="c.id" :value="c.id">
-                  {{ c.name }} {{ c.company ? '(' + c.company + ')' : '' }}
-                </option>
-              </select>
-            </div>
-
-            <div>
-              <label class="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
-                Service Package <span class="text-rose-500">*</span>
-              </label>
-              <select
-                v-model.number="form.service_id"
-                required
-                class="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-slate-900 transition-all"
-              >
-                <option value="" disabled>Select Service Package</option>
-                <option v-for="s in services" :key="s.id" :value="s.id">{{ s.name }}</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            <div>
-              <label class="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">Project Status</label>
-              <select
-                v-model="form.status"
-                class="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-slate-900 transition-all"
-              >
-                <option v-for="s in statuses" :key="s" :value="s">{{ s }}</option>
-              </select>
-            </div>
-
-            <div>
-              <label class="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
-                Total Contract Budget (IDR) <span class="text-rose-500">*</span>
-              </label>
-              <input
-                v-model.number="form.total_budget"
-                type="number"
-                min="0"
-                step="50000"
-                required
-                class="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-slate-900 transition-all tabular-nums font-semibold"
-              />
-            </div>
-          </div>
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            <div>
-              <label class="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">Start Date</label>
-              <input
-                v-model="form.start_date"
-                type="date"
-                class="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-slate-900 transition-all"
-              />
-            </div>
-
-            <div>
-              <label class="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">Target End Date</label>
-              <input
-                v-model="form.end_date"
-                type="date"
-                class="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-slate-900 transition-all"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">Project Description &amp; Scope</label>
-            <textarea
-              v-model="form.description"
-              rows="4"
-              placeholder="Scope of work, deliverables, client requirements, milestones..."
-              class="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-slate-900 transition-all leading-relaxed"
-            ></textarea>
-          </div>
-
-          <div class="pt-6 border-t border-slate-100 flex items-center justify-end gap-3">
-            <button
-              type="button"
-              @click="handleCancel"
-              class="px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              :disabled="saving"
-              class="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-white text-sm font-semibold rounded-xl shadow-sm flex items-center gap-2 transition-all"
-            >
-              <span v-if="saving" class="spinner"></span>
-              {{ isEdit ? 'Save Changes' : 'Create Project' }}
-            </button>
-          </div>
-        </form>
       </div>
     </div>
   `
@@ -554,7 +504,10 @@ window.ProjectDetailView = {
   components: {
     ConfirmModal: window.ConfirmModal
   },
-  props: ['id'],
+  props: {
+    id: { type: Number, required: true },
+    initialTab: { type: String, default: 'tasks' }
+  },
   data() {
     let savedMode = 'list';
     try {
@@ -564,11 +517,12 @@ window.ProjectDetailView = {
 
     return {
       loading: true,
+      error: '',
       project: null,
       files: [],
       tasks: [],
       taskStats: { total: 0, completed: 0, in_progress: 0, review: 0, todo: 0, progress_percent: 0 },
-      activeTab: 'tasks',
+      activeTab: this.initialTab || 'tasks',
       showDeleteConfirm: false,
       showRegenerateConfirm: false,
       deleteTarget: null,
@@ -579,7 +533,6 @@ window.ProjectDetailView = {
 
       taskFilter: 'all',
 
-      // Inline Forms Expansion States
       showAddTaskForm: false,
       showAddPaymentForm: false,
       showAddExpenseForm: false,
@@ -628,21 +581,23 @@ window.ProjectDetailView = {
       selectedFile: null,
       selectedFileName: '',
 
-      // Kanban & Inline Task Edit Data
       taskViewMode: savedMode,
       kanbanColumns: [
-        { id: 'Todo', title: 'To Do', dotColor: 'bg-slate-400', topAccent: 'border-t-slate-400', badgeBg: 'bg-slate-200 text-slate-700' },
-        { id: 'In Progress', title: 'In Progress', dotColor: 'bg-amber-500', topAccent: 'border-t-amber-500', badgeBg: 'bg-amber-100 text-amber-800' },
-        { id: 'Review', title: 'Review', dotColor: 'bg-blue-500', topAccent: 'border-t-blue-500', badgeBg: 'bg-blue-100 text-blue-800' },
-        { id: 'Completed', title: 'Done', dotColor: 'bg-emerald-500', topAccent: 'border-t-emerald-500', badgeBg: 'bg-emerald-100 text-emerald-800' }
+        { id: 'Todo', title: 'To Do', dotClass: 'st-neutral' },
+        { id: 'In Progress', title: 'In Progress', dotClass: 'st-blue' },
+        { id: 'Review', title: 'Review', dotClass: 'st-amber' },
+        { id: 'Completed', title: 'Done', dotClass: 'st-green' }
       ],
-      columnRefs: {},
-      sortableInstances: [],
       expandedCardId: null,
       editingTask: { title: '', description: '', priority: 'Medium', due_date: '', status: 'Todo' },
       quickAddColumn: null,
       quickAddTitle: ''
     };
+  },
+  created() {
+    this._columnRefs = {};
+    this._sortableInstances = [];
+    this._isUnmounted = false;
   },
   watch: {
     id() {
@@ -651,6 +606,12 @@ window.ProjectDetailView = {
       this.editingPaymentId = null;
       this.editingExpenseId = null;
       this.loadProject();
+    },
+    initialTab(newTab) {
+      if (newTab && ['tasks', 'payments', 'expenses', 'communications', 'files'].includes(newTab)) {
+        this.activeTab = newTab;
+        this.itemError = '';
+      }
     },
     taskViewMode(newMode) {
       try {
@@ -685,11 +646,14 @@ window.ProjectDetailView = {
     await this.loadProject();
   },
   beforeUnmount() {
+    this._isUnmounted = true;
     this.destroyKanbanSortable();
   },
   methods: {
     async loadProject() {
+      this.destroyKanbanSortable();
       this.loading = true;
+      this.error = '';
       try {
         const [projectRes, filesRes, tasksRes] = await Promise.all([
           window.API.projects.getOne(this.id),
@@ -701,17 +665,28 @@ window.ProjectDetailView = {
         this.tasks = tasksRes.data?.data?.tasks || [];
         this.taskStats = tasksRes.data?.data?.stats || { total: 0, completed: 0, in_progress: 0, review: 0, todo: 0, progress_percent: 0 };
       } catch (err) {
+        this.error = 'Failed to load project details.';
         window.Utils.toast('Failed to load project details', 'error');
       } finally {
         this.loading = false;
       }
-      if (this.project && this.activeTab === 'tasks' && this.taskViewMode === 'board') {
+      if (!this._isUnmounted && this.project && this.activeTab === 'tasks' && this.taskViewMode === 'board') {
         await this.$nextTick();
-        this.initKanbanSortable();
+        if (!this._isUnmounted) {
+          this.initKanbanSortable();
+        }
       }
     },
     goToEdit() {
       window.location.hash = `#/projects/${this.id}/edit`;
+    },
+    selectTab(tab) {
+      this.activeTab = tab;
+      this.itemError = '';
+      const targetHash = `#/projects/${this.id}?tab=${tab}`;
+      if (window.location.hash !== targetHash) {
+        window.location.hash = targetHash;
+      }
     },
     async updateProjectStatus(newStatus) {
       try {
@@ -743,9 +718,9 @@ window.ProjectDetailView = {
       const url = this.getPortalUrl();
       if (!url) return;
       navigator.clipboard.writeText(url).then(() => {
-        window.Utils.toast('Client Portal link copied to clipboard!', 'success');
+        window.Utils.toast('Client Portal link copied to clipboard', 'success');
       }).catch(() => {
-        window.Utils.toast('Copy link: ' + url, 'info');
+        window.Utils.toast('Portal URL: ' + url, 'info');
       });
     },
     previewPortal() {
@@ -1041,20 +1016,34 @@ window.ProjectDetailView = {
         .sort((a, b) => (parseFloat(a.order_index) || 0) - (parseFloat(b.order_index) || 0));
     },
     setColumnRef(colId, el) {
-      if (el) this.columnRefs[colId] = el;
+      if (!this._columnRefs) this._columnRefs = {};
+      if (el) {
+        this._columnRefs[colId] = el;
+      } else {
+        delete this._columnRefs[colId];
+      }
     },
     initKanbanSortable() {
-      this.sortableInstances.forEach(s => s.destroy());
-      this.sortableInstances = [];
+      this.destroyKanbanSortable();
+      if (this._isUnmounted) return;
 
       this.$nextTick(() => {
+        if (this._isUnmounted || this.activeTab !== 'tasks' || this.taskViewMode !== 'board') return;
         this.kanbanColumns.forEach(col => {
-          const el = this.columnRefs[col.id];
-          if (!el) return;
+          const el = (this._columnRefs || {})[col.id];
+          if (!el || !el.isConnected) return;
+          if (typeof Sortable.get === 'function') {
+            const existing = Sortable.get(el);
+            if (existing && existing.el) {
+              try {
+                existing.destroy();
+              } catch (e) {}
+            }
+          }
 
           const instance = new Sortable(el, {
             group: 'project-kanban',
-            animation: 180,
+            animation: 150,
             ghostClass: 'kanban-ghost',
             chosenClass: 'kanban-chosen',
             dragClass: 'kanban-drag',
@@ -1067,14 +1056,19 @@ window.ProjectDetailView = {
               this.handleCardDrop(taskId, toStatus, newIndex);
             }
           });
-          this.sortableInstances.push(instance);
+          this._sortableInstances.push(instance);
         });
       });
     },
     destroyKanbanSortable() {
-      this.sortableInstances.forEach(s => s.destroy());
-      this.sortableInstances = [];
-      this.columnRefs = {};
+      (this._sortableInstances || []).forEach(s => {
+        if (s && s.el) {
+          try {
+            s.destroy();
+          } catch (e) {}
+        }
+      });
+      this._sortableInstances = [];
     },
     async handleCardDrop(taskId, toStatus, newIndex) {
       const task = this.tasks.find(t => t.id === taskId);
@@ -1103,7 +1097,6 @@ window.ProjectDetailView = {
         }
       }
 
-      // Optimistic update (always apply status + completed_at)
       task.status = toStatus;
       task.order_index = newOrder;
       if (toStatus === 'Completed') {
@@ -1208,1036 +1201,826 @@ window.ProjectDetailView = {
     }
   },
   template: `
-    <div>
-      <!-- Back Navigation & Actions -->
-      <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
-        <a href="#/projects" class="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-          Back to Projects
-        </a>
+    <div class="flex flex-col min-h-full">
+      <!-- Slim Top Breadcrumb & Actions -->
+      <div class="min-h-[44px] px-5 sm:px-6 py-2 hairline-b flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-2 text-xs text-sub min-w-0">
+          <a href="#/projects" class="hover:text-ink shrink-0">Projects</a>
+          <span class="text-muted shrink-0">/</span>
+          <span class="font-semibold text-ink truncate max-w-[240px]">{{ project?.title || ('Project #' + id) }}</span>
+        </div>
         <div class="flex items-center gap-2">
-          <button
-            @click="goToEdit"
-            class="px-3.5 py-1.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl shadow-sm flex items-center gap-1.5 transition-colors"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
-            Edit Project
-          </button>
-          <button
-            @click="showDeleteConfirm = true"
-            class="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-sm font-semibold rounded-xl flex items-center gap-1.5 transition-colors"
-          >
-            Delete
-          </button>
+          <button type="button" @click="goToEdit" class="btn-secondary text-xs py-1 px-2.5">Edit Project</button>
+          <button type="button" @click="showDeleteConfirm = true" class="btn-danger text-xs py-1 px-2.5">Delete</button>
         </div>
       </div>
 
-      <!-- Loading State -->
-      <div v-if="loading" class="py-20 flex flex-col items-center justify-center">
-        <div class="spinner spinner-lg text-slate-900"></div>
-        <p class="text-sm text-slate-500 mt-3">Loading project details...</p>
-      </div>
-
-      <div v-else-if="project" class="space-y-6 animate-in">
-        <!-- Project Header Card -->
-        <div class="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-8 shadow-sm">
-          <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
-            <div>
-              <div class="flex items-center gap-2.5 flex-wrap mb-2.5">
-                <select
-                  :value="project.status"
-                  @change="updateProjectStatus($event.target.value)"
-                  class="text-xs font-semibold px-2.5 py-1 rounded-full border cursor-pointer focus:outline-none"
-                  :class="getStatusBadgeClass(project.status)"
-                >
-                  <option v-for="s in projectStatuses" :key="s" :value="s">{{ s }}</option>
-                </select>
-                <span class="text-xs text-slate-500 font-medium">{{ project.service_name || 'Custom Service' }}</span>
-              </div>
-              <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">{{ project.title }}</h1>
-              <p class="text-sm font-medium text-slate-600 mt-1">
-                Client: <a :href="'#/clients/' + project.client_id" class="text-slate-900 font-semibold hover:text-indigo-600 hover:underline">{{ project.client_name }}</a>
-                <span v-if="project.client_company"> ({{ project.client_company }})</span>
-              </p>
-            </div>
-
-            <!-- Financial Quick Stats -->
-            <div class="grid grid-cols-3 gap-4 p-4 bg-slate-50 rounded-xl border border-slate-200/80 w-full lg:w-auto">
-              <div>
-                <p class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Total Contract</p>
-                <p class="text-sm sm:text-lg font-bold text-slate-900 tabular-nums mt-0.5">{{ formatCurrency(project.total_budget) }}</p>
-              </div>
-              <div>
-                <p class="text-[10px] uppercase font-bold text-emerald-600 tracking-wider">Collected</p>
-                <p class="text-sm sm:text-lg font-bold text-emerald-700 tabular-nums mt-0.5">{{ formatCurrency(project.total_received) }}</p>
-              </div>
-              <div>
-                <p class="text-[10px] uppercase font-bold text-rose-600 tracking-wider">Expenses</p>
-                <p class="text-sm sm:text-lg font-bold text-rose-700 tabular-nums mt-0.5">{{ formatCurrency(project.total_expenses) }}</p>
-              </div>
-            </div>
+      <div class="p-5 sm:p-6 space-y-5">
+        <!-- Skeleton Loading -->
+        <div v-if="loading" class="space-y-4">
+          <div class="surface-card p-6 space-y-3">
+            <div class="skeleton-bar h-6 w-64"></div>
+            <div class="skeleton-bar h-4 w-48"></div>
+            <div class="skeleton-bar h-3 w-full"></div>
           </div>
-
-          <!-- Dual Progress Bars -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mt-6 pt-6 border-t border-slate-100">
-            <div class="bg-slate-50/75 p-4 rounded-xl border border-slate-200/60">
-              <div class="flex items-center justify-between text-xs mb-2">
-                <span class="font-semibold text-slate-700 flex items-center gap-1.5">
-                  <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
-                  Work Execution Progress
-                </span>
-                <span class="font-bold text-slate-900 tabular-nums">{{ taskStats.progress_percent }}% ({{ taskStats.completed }}/{{ taskStats.total }} tasks)</span>
-              </div>
-              <div class="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
-                <div
-                  class="h-full bg-indigo-600 rounded-full transition-all duration-500"
-                  :style="{ width: taskStats.progress_percent + '%' }"
-                ></div>
-              </div>
-            </div>
-
-            <div class="bg-slate-50/75 p-4 rounded-xl border border-slate-200/60">
-              <div class="flex items-center justify-between text-xs mb-2">
-                <span class="font-semibold text-slate-700 flex items-center gap-1.5">
-                  <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
-                  Payment Collection
-                </span>
-                <span class="font-bold text-emerald-700 tabular-nums">
-                  {{ project.total_budget > 0 ? Math.round((project.total_received / project.total_budget) * 100) : 0 }}%
-                </span>
-              </div>
-              <div class="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
-                <div
-                  class="h-full bg-emerald-500 rounded-full transition-all duration-500"
-                  :style="{ width: (project.total_budget > 0 ? Math.min(100, (project.total_received / project.total_budget) * 100) : 0) + '%' }"
-                ></div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Timeline & Description -->
-          <div class="mt-4 flex flex-wrap items-center gap-6 text-xs text-slate-500">
-            <span>Start: <strong class="text-slate-700">{{ formatDate(project.start_date) }}</strong></span>
-            <span>Target End: <strong class="text-slate-700">{{ formatDate(project.end_date) }}</strong></span>
-          </div>
-          <p v-if="project.description" class="mt-3 text-xs sm:text-sm text-slate-600 leading-relaxed bg-slate-50/70 p-4 rounded-xl border border-slate-100 whitespace-pre-line">
-            {{ project.description }}
-          </p>
         </div>
 
-        <!-- CLIENT PORTAL SHARE BANNER -->
-        <div class="bg-gradient-to-r from-slate-900 to-indigo-950 text-white rounded-2xl p-5 sm:p-6 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div class="space-y-1">
-            <div class="flex items-center gap-2 flex-wrap">
-              <span
-                class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase border"
-                :class="project.portal_enabled ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border-amber-500/30'"
-              >
-                {{ project.portal_enabled ? 'Portal Active' : 'Portal Paused' }}
-              </span>
-              <h3 class="font-bold text-white text-base">Client Progress Portal</h3>
+        <!-- Error State -->
+        <div v-else-if="error" class="surface-card p-5 border-[var(--st-red-border)] flex items-center justify-between gap-4">
+          <p class="text-sm font-medium text-st-red">{{ error }}</p>
+          <button type="button" @click="loadProject" class="btn-secondary">Retry</button>
+        </div>
+
+        <div v-else-if="project" class="space-y-5 animate-in">
+          <!-- Project Summary Header -->
+          <div class="surface-card p-5 sm:p-6">
+            <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-5">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2.5 flex-wrap mb-2">
+                  <select
+                    :value="project.status"
+                    @change="updateProjectStatus($event.target.value)"
+                    aria-label="Project status"
+                    class="text-xs font-semibold px-2.5 py-0.5 rounded-[4px] border"
+                    :class="getStatusBadgeClass(project.status)"
+                  >
+                    <option v-for="s in projectStatuses" :key="s" :value="s">{{ s }}</option>
+                  </select>
+                  <span class="text-xs font-medium text-muted">{{ project.service_name || 'Custom Service' }}</span>
+                </div>
+                <h1 class="text-xl sm:text-2xl font-bold text-ink tracking-tight">{{ project.title }}</h1>
+                <p class="text-[13px] text-sub mt-1">
+                  Client: <a :href="'#/clients/' + project.client_id" class="text-ink font-semibold hover:text-accent hover:underline">{{ project.client_name }}</a>
+                  <span v-if="project.client_company"> ({{ project.client_company }})</span>
+                </p>
+              </div>
+
+              <!-- Flat Inline Financial Summary -->
+              <div class="grid grid-cols-3 gap-5 lg:border-l hairline lg:pl-6 shrink-0">
+                <div>
+                  <p class="text-xs font-medium text-muted">Total Contract</p>
+                  <p class="text-sm sm:text-base font-bold text-ink tabular-nums mt-0.5">{{ formatCurrency(project.total_budget) }}</p>
+                </div>
+                <div>
+                  <p class="text-xs font-medium text-muted">Collected</p>
+                  <p class="text-sm sm:text-base font-bold text-st-green tabular-nums mt-0.5">{{ formatCurrency(project.total_received) }}</p>
+                </div>
+                <div>
+                  <p class="text-xs font-medium text-muted">Expenses</p>
+                  <p class="text-sm sm:text-base font-bold text-st-red tabular-nums mt-0.5">{{ formatCurrency(project.total_expenses) }}</p>
+                </div>
+              </div>
             </div>
-            <p class="text-xs text-slate-300 max-w-xl leading-relaxed">
-              Share this secure link with {{ project.client_name }} to let them track real-time milestones, tasks, deliverables, and invoices without admin login.
+
+            <!-- Dual Progress Indicators -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mt-5 pt-4 hairline-t">
+              <div>
+                <div class="flex items-center justify-between text-xs mb-1.5">
+                  <span class="font-medium text-sub">Work Execution Progress</span>
+                  <span class="font-semibold text-ink tabular-nums">{{ taskStats.progress_percent }}% ({{ taskStats.completed }}/{{ taskStats.total }} tasks)</span>
+                </div>
+                <div class="w-full h-1.5 surface-subtle rounded-full overflow-hidden">
+                  <div class="h-full bg-[#2563eb] rounded-full transition-all duration-300" :style="{ width: taskStats.progress_percent + '%' }"></div>
+                </div>
+              </div>
+
+              <div>
+                <div class="flex items-center justify-between text-xs mb-1.5">
+                  <span class="font-medium text-sub">Payment Collection</span>
+                  <span class="font-semibold text-st-green tabular-nums">
+                    {{ project.total_budget > 0 ? Math.round((project.total_received / project.total_budget) * 100) : 0 }}%
+                  </span>
+                </div>
+                <div class="w-full h-1.5 surface-subtle rounded-full overflow-hidden">
+                  <div class="h-full bg-[#16a34a] rounded-full transition-all duration-300" :style="{ width: (project.total_budget > 0 ? Math.min(100, (project.total_received / project.total_budget) * 100) : 0) + '%' }"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-4 pt-3.5 hairline-t flex flex-wrap items-center gap-6 text-xs text-sub">
+              <span>Start: <strong class="text-ink">{{ formatDate(project.start_date) }}</strong></span>
+              <span>Target End: <strong class="text-ink">{{ formatDate(project.end_date) }}</strong></span>
+            </div>
+            <p v-if="project.description" class="mt-3 text-[13px] text-sub leading-relaxed whitespace-pre-line">
+              {{ project.description }}
             </p>
           </div>
 
-          <div class="flex flex-wrap items-center gap-2 self-stretch sm:self-auto shrink-0">
-            <button
-              @click="copyPortalLink"
-              class="flex-1 sm:flex-initial px-4 py-2 bg-white text-slate-900 hover:bg-slate-100 text-xs font-bold rounded-xl shadow transition-colors flex items-center justify-center gap-1.5"
-            >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
-              Copy Link
-            </button>
-            <button
-              @click="previewPortal"
-              class="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white border border-white/20 text-xs font-semibold rounded-xl transition-colors flex items-center justify-center gap-1.5"
-              title="Open portal in new tab"
-            >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-              Preview
-            </button>
-            <button
-              @click="togglePortalEnabled"
-              class="px-3 py-2 bg-white/10 hover:bg-white/20 text-white border border-white/20 text-xs font-semibold rounded-xl transition-colors"
-              :title="project.portal_enabled ? 'Disable public access' : 'Enable public access'"
-            >
-              {{ project.portal_enabled ? 'Pause' : 'Enable' }}
-            </button>
-            <button
-              @click="showRegenerateConfirm = true"
-              aria-label="Regenerate portal link"
-              class="p-2 text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
-              title="Regenerate/Revoke link"
-            >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-            </button>
-          </div>
-        </div>
-
-        <!-- Management Tabs Section -->
-        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-          <!-- Tab Headers -->
-          <div class="border-b border-slate-200 bg-slate-50/75 px-4 sm:px-6 flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-4">
-            <div class="flex items-center gap-5 overflow-x-auto min-w-0">
-              <button
-                @click="activeTab = 'tasks'; itemError = '';"
-                :class="['py-4 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap shrink-0', activeTab === 'tasks' ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-700']"
-              >
-                Tasks &amp; Milestones ({{ tasks.length }})
-              </button>
-              <button
-                @click="activeTab = 'payments'; itemError = '';"
-                :class="['py-4 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap shrink-0', activeTab === 'payments' ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-700']"
-              >
-                Payments ({{ project.recent_payments?.length || 0 }})
-              </button>
-              <button
-                @click="activeTab = 'expenses'; itemError = '';"
-                :class="['py-4 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap shrink-0', activeTab === 'expenses' ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-700']"
-              >
-                Expenses ({{ project.recent_expenses?.length || 0 }})
-              </button>
-              <button
-                @click="activeTab = 'communications'; itemError = '';"
-                :class="['py-4 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap shrink-0', activeTab === 'communications' ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-700']"
-              >
-                Communications ({{ project.recent_communications?.length || 0 }})
-              </button>
-              <button
-                @click="activeTab = 'files'; itemError = '';"
-                :class="['py-4 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap shrink-0', activeTab === 'files' ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-700']"
-              >
-                Deliverables &amp; Files ({{ files.length }})
-              </button>
+          <!-- CLIENT PORTAL SHARE BAR -->
+          <div class="surface-subtle border hairline rounded-[8px] px-4 sm:px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div class="space-y-1">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="status-sq" :class="project.portal_enabled ? 'st-green' : 'st-amber'" aria-hidden="true"></span>
+                <span class="text-xs font-semibold" :class="project.portal_enabled ? 'text-st-green' : 'text-st-amber'">
+                  {{ project.portal_enabled ? 'Portal Active' : 'Portal Paused' }}
+                </span>
+                <span class="text-xs text-muted">&bull;</span>
+                <h2 class="text-sm font-semibold text-ink">Client Progress Portal</h2>
+              </div>
+              <p class="text-xs text-sub max-w-2xl">
+                Share this token link with {{ project.client_name }} to track milestones, files, and payment receipts without admin login.
+              </p>
             </div>
 
-            <!-- Tab Action Button -->
-            <div class="shrink-0 pb-3 md:pb-0 flex justify-end">
-              <button
-                v-if="activeTab === 'tasks'"
-                @click="showAddTaskForm = !showAddTaskForm; itemError = '';"
-                class="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl shadow-sm flex items-center gap-1.5"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                {{ showAddTaskForm ? 'Close Form' : 'Add Task' }}
+            <div class="flex flex-wrap items-center gap-2 shrink-0">
+              <button type="button" @click="copyPortalLink" class="btn-primary text-xs py-1.5 px-3">
+                Copy Link
+              </button>
+              <button type="button" @click="previewPortal" class="btn-secondary text-xs py-1.5 px-3">
+                Preview
+              </button>
+              <button type="button" @click="togglePortalEnabled" class="btn-secondary text-xs py-1.5 px-3">
+                {{ project.portal_enabled ? 'Pause' : 'Enable' }}
               </button>
               <button
-                v-else-if="activeTab === 'payments'"
-                @click="showAddPaymentForm = !showAddPaymentForm; itemError = '';"
-                class="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl shadow-sm flex items-center gap-1.5"
+                type="button"
+                @click="showRegenerateConfirm = true"
+                aria-label="Regenerate portal link"
+                title="Regenerate or revoke link"
+                class="btn-secondary p-1.5"
               >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                {{ showAddPaymentForm ? 'Close Form' : 'Add Payment' }}
-              </button>
-              <button
-                v-else-if="activeTab === 'expenses'"
-                @click="showAddExpenseForm = !showAddExpenseForm; itemError = '';"
-                class="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl shadow-sm flex items-center gap-1.5"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                {{ showAddExpenseForm ? 'Close Form' : 'Record Expense' }}
-              </button>
-              <button
-                v-else-if="activeTab === 'communications'"
-                @click="showAddCommForm = !showAddCommForm; itemError = '';"
-                class="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl shadow-sm flex items-center gap-1.5"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                {{ showAddCommForm ? 'Close Form' : 'Log Interaction' }}
-              </button>
-              <button
-                v-else-if="activeTab === 'files'"
-                @click="showUploadFileForm = !showUploadFileForm; itemError = '';"
-                class="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl shadow-sm flex items-center gap-1.5"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                {{ showUploadFileForm ? 'Close Form' : 'Upload File' }}
+                <svg class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
               </button>
             </div>
           </div>
 
-          <!-- TAB 1: TASKS & MILESTONES -->
-          <div v-if="activeTab === 'tasks'">
-            <!-- Inline Add Task Form Card -->
-            <div v-if="showAddTaskForm" class="p-6 bg-slate-50 border-b border-slate-200 animate-in">
-              <h3 class="text-sm font-bold text-slate-900 mb-4">Create Project Task / Milestone</h3>
-              <div v-if="itemError" class="mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl">{{ itemError }}</div>
+          <!-- Management Tabs Section -->
+          <div class="surface-card overflow-hidden">
+            <!-- Tab Headers -->
+            <div class="hairline-b surface-subtle px-4 sm:px-5 flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-4">
+              <div class="flex items-center gap-5 overflow-x-auto min-w-0" role="tablist">
+                <button
+                  type="button"
+                  role="tab"
+                  @click="selectTab('tasks')"
+                  :class="['tab-link', activeTab === 'tasks' ? 'tab-link-active' : '']"
+                >
+                  Tasks &amp; Milestones ({{ tasks.length }})
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  @click="selectTab('payments')"
+                  :class="['tab-link', activeTab === 'payments' ? 'tab-link-active' : '']"
+                >
+                  Payments ({{ project.recent_payments?.length || 0 }})
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  @click="selectTab('expenses')"
+                  :class="['tab-link', activeTab === 'expenses' ? 'tab-link-active' : '']"
+                >
+                  Expenses ({{ project.recent_expenses?.length || 0 }})
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  @click="selectTab('communications')"
+                  :class="['tab-link', activeTab === 'communications' ? 'tab-link-active' : '']"
+                >
+                  Communications ({{ project.recent_communications?.length || 0 }})
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  @click="selectTab('files')"
+                  :class="['tab-link', activeTab === 'files' ? 'tab-link-active' : '']"
+                >
+                  Deliverables &amp; Files ({{ files.length }})
+                </button>
+              </div>
 
-              <form @submit.prevent="handleSaveTask" class="space-y-4">
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div class="sm:col-span-2">
-                    <label class="block text-xs font-semibold uppercase text-slate-700 mb-1">Task Title *</label>
-                    <input
-                      v-model="taskForm.title"
-                      type="text"
-                      required
-                      placeholder="e.g. Wireframe & User Flow Approval"
-                      class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-medium"
-                    />
+              <!-- Tab Action Button -->
+              <div class="shrink-0 pb-2.5 md:pb-0 flex justify-end">
+                <button v-if="activeTab === 'tasks'" type="button" @click="showAddTaskForm = !showAddTaskForm; itemError = '';" class="btn-primary text-xs py-1 px-2.5">
+                  {{ showAddTaskForm ? 'Close Form' : 'Add Task' }}
+                </button>
+                <button v-else-if="activeTab === 'payments'" type="button" @click="showAddPaymentForm = !showAddPaymentForm; itemError = '';" class="btn-primary text-xs py-1 px-2.5">
+                  {{ showAddPaymentForm ? 'Close Form' : 'Add Payment' }}
+                </button>
+                <button v-else-if="activeTab === 'expenses'" type="button" @click="showAddExpenseForm = !showAddExpenseForm; itemError = '';" class="btn-primary text-xs py-1 px-2.5">
+                  {{ showAddExpenseForm ? 'Close Form' : 'Record Expense' }}
+                </button>
+                <button v-else-if="activeTab === 'communications'" type="button" @click="showAddCommForm = !showAddCommForm; itemError = '';" class="btn-primary text-xs py-1 px-2.5">
+                  {{ showAddCommForm ? 'Close Form' : 'Log Interaction' }}
+                </button>
+                <button v-else-if="activeTab === 'files'" type="button" @click="showUploadFileForm = !showUploadFileForm; itemError = '';" class="btn-primary text-xs py-1 px-2.5">
+                  {{ showUploadFileForm ? 'Close Form' : 'Upload File' }}
+                </button>
+              </div>
+            </div>
+
+            <!-- TAB 1: TASKS & MILESTONES -->
+            <div v-if="activeTab === 'tasks'">
+              <div v-if="showAddTaskForm" class="p-5 surface-subtle hairline-b animate-in">
+                <h3 class="text-xs font-semibold text-ink mb-3.5">Create Project Task / Milestone</h3>
+                <div v-if="itemError" class="mb-3 p-2.5 rounded-[6px] border badge-red text-xs">{{ itemError }}</div>
+
+                <form @submit.prevent="handleSaveTask" class="space-y-3.5">
+                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                    <div class="sm:col-span-2">
+                      <label for="new-task-title" class="field-label">Task Title *</label>
+                      <input id="new-task-title" v-model="taskForm.title" type="text" required placeholder="Wireframe & User Flow Approval" class="field-input font-medium" />
+                    </div>
+                    <div>
+                      <label for="new-task-priority" class="field-label">Priority</label>
+                      <select id="new-task-priority" v-model="taskForm.priority" class="field-input">
+                        <option value="Low">Low</option>
+                        <option value="Medium">Medium</option>
+                        <option value="High">High</option>
+                      </select>
+                    </div>
                   </div>
+
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div>
+                      <label for="new-task-due" class="field-label">Target Due Date</label>
+                      <input id="new-task-due" v-model="taskForm.due_date" type="date" class="field-input" />
+                    </div>
+                    <div>
+                      <label for="new-task-status" class="field-label">Initial Status</label>
+                      <select id="new-task-status" v-model="taskForm.status" class="field-input">
+                        <option value="Todo">Todo (Not Started)</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Review">Review</option>
+                        <option value="Completed">Completed</option>
+                      </select>
+                    </div>
+                  </div>
+
                   <div>
-                    <label class="block text-xs font-semibold uppercase text-slate-700 mb-1">Priority</label>
-                    <select
-                      v-model="taskForm.priority"
-                      class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                    >
-                      <option value="Low">Low</option>
-                      <option value="Medium">Medium</option>
-                      <option value="High">High</option>
-                    </select>
+                    <label for="new-task-desc" class="field-label">Description &amp; Deliverables</label>
+                    <textarea id="new-task-desc" v-model="taskForm.description" rows="2" placeholder="Requirements, checklist items, or links..." class="field-input"></textarea>
                   </div>
-                </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label class="block text-xs font-semibold uppercase text-slate-700 mb-1">Target Due Date</label>
-                    <input
-                      v-model="taskForm.due_date"
-                      type="date"
-                      class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                    />
+                  <div class="flex items-center justify-end gap-2 pt-1">
+                    <button type="button" @click="showAddTaskForm = false" class="btn-secondary text-xs">Cancel</button>
+                    <button type="submit" :disabled="itemSubmitting" class="btn-primary text-xs">
+                      <span v-if="itemSubmitting" class="spinner" aria-hidden="true"></span>
+                      <span>Save Task</span>
+                    </button>
                   </div>
-                  <div>
-                    <label class="block text-xs font-semibold uppercase text-slate-700 mb-1">Initial Status</label>
-                    <select
-                      v-model="taskForm.status"
-                      class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                    >
-                      <option value="Todo">Todo (Not Started)</option>
-                      <option value="In Progress">In Progress</option>
-                      <option value="Review">Review</option>
-                      <option value="Completed">Completed</option>
-                    </select>
-                  </div>
-                </div>
+                </form>
+              </div>
 
-                <div>
-                  <label class="block text-xs font-semibold uppercase text-slate-700 mb-1">Description &amp; Deliverables</label>
-                  <textarea
-                    v-model="taskForm.description"
-                    rows="2"
-                    placeholder="Specific requirements, checklist items, or links..."
-                    class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                  ></textarea>
-                </div>
-
-                <div class="flex items-center justify-end gap-3 pt-2">
-                  <button type="button" @click="showAddTaskForm = false" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-xl">Cancel</button>
-                  <button type="submit" :disabled="itemSubmitting" class="px-5 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-white text-xs font-semibold rounded-xl shadow-sm flex items-center gap-1.5">
-                    <span v-if="itemSubmitting" class="spinner"></span>
-                    Save Task
+              <!-- View Mode Switcher & Filter Toolbar -->
+              <div class="px-4 sm:px-5 py-2.5 surface-canvas hairline-b flex flex-wrap items-center justify-between gap-3">
+                <div class="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    @click="taskViewMode = 'list'"
+                    :class="[taskViewMode === 'list' ? 'btn-primary' : 'btn-secondary', 'text-xs py-1 px-2.5']"
+                  >
+                    List
+                  </button>
+                  <button
+                    type="button"
+                    @click="taskViewMode = 'board'"
+                    :class="[taskViewMode === 'board' ? 'btn-primary' : 'btn-secondary', 'text-xs py-1 px-2.5']"
+                  >
+                    Board
                   </button>
                 </div>
-              </form>
-            </div>
 
-            <!-- View Mode Switcher & Filter Toolbar -->
-            <div class="p-4 bg-slate-50/50 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
-              <div class="flex items-center gap-2">
-                <button @click="taskViewMode = 'list'"
-                  :class="['px-3 py-1.5 text-xs font-bold rounded-xl border transition-all flex items-center gap-1.5', taskViewMode === 'list' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400']">
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
-                  List
-                </button>
-                <button @click="taskViewMode = 'board'"
-                  :class="['px-3 py-1.5 text-xs font-bold rounded-xl border transition-all flex items-center gap-1.5', taskViewMode === 'board' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400']">
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-                  Board
-                </button>
-              </div>
-
-              <div v-if="taskViewMode === 'list'" class="flex items-center gap-1.5">
-                <button
-                  @click="taskFilter = 'all'"
-                  :class="['px-3 py-1 text-xs font-semibold rounded-xl transition-colors', taskFilter === 'all' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-200']"
-                >
-                  All ({{ tasks.length }})
-                </button>
-                <button
-                  @click="taskFilter = 'active'"
-                  :class="['px-3 py-1 text-xs font-semibold rounded-xl transition-colors', taskFilter === 'active' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-200']"
-                >
-                  Active ({{ tasks.length - taskStats.completed }})
-                </button>
-                <button
-                  @click="taskFilter = 'completed'"
-                  :class="['px-3 py-1 text-xs font-semibold rounded-xl transition-colors', taskFilter === 'completed' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-200']"
-                >
-                  Completed ({{ taskStats.completed }})
-                </button>
-              </div>
-            </div>
-
-            <!-- List View -->
-            <div v-if="taskViewMode === 'list'" class="divide-y divide-slate-100">
-              <div v-if="filteredTasks.length === 0" class="p-12 text-center text-sm text-slate-400">
-                No tasks found. Click "Add Task" to create your first milestone.
-              </div>
-              <div
-                v-for="t in filteredTasks"
-                :key="t.id"
-                class="p-4 sm:p-5 hover:bg-slate-50/70 transition-colors"
-              >
-                <div class="flex items-start justify-between gap-4">
-                  <div class="flex items-start gap-3.5 min-w-0 flex-1">
-                    <button
-                      type="button"
-                      @click="toggleTask(t)"
-                      :aria-label="'Toggle ' + t.title"
-                      :class="['w-5 h-5 mt-0.5 rounded-md border flex items-center justify-center shrink-0 transition-colors', t.status === 'Completed' ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 hover:border-slate-500 bg-white']"
-                    >
-                      <svg v-if="t.status === 'Completed'" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
-                      </svg>
-                    </button>
-
-                    <div class="min-w-0 flex-1">
-                      <div class="flex items-center gap-2 flex-wrap">
-                        <span
-                          @click="expandCard(t)"
-                          :class="['text-sm font-semibold cursor-pointer hover:text-indigo-600 transition-colors', t.status === 'Completed' ? 'line-through text-slate-400' : 'text-slate-900']"
-                        >
-                          {{ t.title }}
-                        </span>
-                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase" :class="getPriorityClass(t.priority)">
-                          {{ t.priority }}
-                        </span>
-                        <span v-if="t.status === 'In Progress'" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
-                          In Progress
-                        </span>
-                        <span v-if="t.status === 'Review'" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                          Review
-                        </span>
-                        <span v-if="isOverdue(t.due_date, t.status)" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
-                          Overdue
-                        </span>
-                      </div>
-
-                      <p v-if="t.description" class="text-xs text-slate-600 mt-1 leading-relaxed">{{ t.description }}</p>
-                      <p v-if="t.due_date" class="text-[11px] text-slate-400 mt-1.5 flex items-center gap-1" :class="{ 'text-rose-600 font-semibold': isOverdue(t.due_date, t.status) }">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                        Due: {{ formatDate(t.due_date) }}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div class="flex items-center gap-1 shrink-0">
-                    <button
-                      @click="expandCard(t)"
-                      aria-label="Edit task"
-                      class="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-                    >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
-                    </button>
-                    <button
-                      @click="deleteTarget = { type: 'task', id: t.id, title: t.title }"
-                      aria-label="Delete task"
-                      class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                    >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                    </button>
-                  </div>
-                </div>
-
-                <!-- Inline Edit Panel for List View -->
-                <div v-if="expandedCardId === t.id" class="mt-4 ml-8 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3 animate-in">
-                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <input v-model="editingTask.title" class="sm:col-span-2 px-3 py-2 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20" placeholder="Task title">
-                    <select v-model="editingTask.status" class="px-3 py-2 text-xs font-semibold border border-slate-300 rounded-xl bg-white">
-                      <option value="Todo">To Do</option>
-                      <option value="In Progress">In Progress</option>
-                      <option value="Review">Review</option>
-                      <option value="Completed">Completed</option>
-                    </select>
-                  </div>
-                  <textarea v-model="editingTask.description" rows="2" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20" placeholder="Description (optional)"></textarea>
-                  <div class="flex flex-wrap items-center justify-between gap-3">
-                    <div class="flex items-center gap-2">
-                      <select v-model="editingTask.priority" class="px-3 py-1.5 text-xs font-semibold border border-slate-300 rounded-xl bg-white">
-                        <option value="Low">Low Priority</option>
-                        <option value="Medium">Medium Priority</option>
-                        <option value="High">High Priority</option>
-                      </select>
-                      <input v-model="editingTask.due_date" type="date" class="px-3 py-1.5 text-xs border border-slate-300 rounded-xl bg-white">
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <button type="button" @click="cancelExpandCard" class="px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-300 rounded-xl hover:bg-slate-100">Cancel</button>
-                      <button type="button" @click="saveExpandedCard(t.id)" class="px-4 py-1.5 text-xs font-semibold text-white bg-slate-900 rounded-xl hover:bg-slate-800">Save Changes</button>
-                    </div>
-                  </div>
+                <div v-if="taskViewMode === 'list'" class="flex items-center gap-1.5">
+                  <button type="button" @click="taskFilter = 'all'" :class="[taskFilter === 'all' ? 'surface-active text-ink font-semibold' : 'text-sub', 'px-2.5 py-1 text-xs rounded-[5px]']">
+                    All ({{ tasks.length }})
+                  </button>
+                  <button type="button" @click="taskFilter = 'active'" :class="[taskFilter === 'active' ? 'surface-active text-ink font-semibold' : 'text-sub', 'px-2.5 py-1 text-xs rounded-[5px]']">
+                    Active ({{ tasks.length - taskStats.completed }})
+                  </button>
+                  <button type="button" @click="taskFilter = 'completed'" :class="[taskFilter === 'completed' ? 'surface-active text-ink font-semibold' : 'text-sub', 'px-2.5 py-1 text-xs rounded-[5px]']">
+                    Completed ({{ taskStats.completed }})
+                  </button>
                 </div>
               </div>
-            </div>
 
-            <!-- Kanban Board View -->
-            <div v-else class="p-4 sm:p-6 overflow-x-auto">
-              <div class="flex items-start gap-4 min-h-[480px]" style="min-width: max-content;">
-                
-                <div v-for="col in kanbanColumns" :key="col.id"
-                  :class="['w-72 sm:w-80 shrink-0 bg-slate-100/80 rounded-2xl flex flex-col max-h-[620px] border border-slate-200/90 border-t-4 shadow-sm', col.topAccent]">
-                  
-                  <!-- Column Header -->
-                  <div class="p-3.5 flex items-center justify-between border-b border-slate-200/60">
-                    <div class="flex items-center gap-2">
-                      <span class="w-2.5 h-2.5 rounded-full" :class="col.dotColor"></span>
-                      <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700">{{ col.title }}</h3>
-                      <span class="px-2 py-0.5 text-[11px] font-bold rounded-full tabular-nums" :class="col.badgeBg">
-                        {{ getColumnTasks(col.id).length }}
-                      </span>
-                    </div>
-                  </div>
+              <!-- List View -->
+              <div v-if="taskViewMode === 'list'" class="divide-hairline">
+                <div v-if="filteredTasks.length === 0" class="p-10 text-center">
+                  <p class="text-xs font-medium text-sub">No tasks in this view.</p>
+                  <button type="button" @click="showAddTaskForm = true" class="btn-secondary text-xs mt-3">Add First Task</button>
+                </div>
+                <div v-for="t in filteredTasks" :key="t.id" class="p-4 row-hover">
+                  <div class="flex items-start justify-between gap-4">
+                    <div class="flex items-start gap-3 min-w-0 flex-1">
+                      <button
+                        type="button"
+                        @click="toggleTask(t)"
+                        :aria-label="'Mark ' + t.title + (t.status === 'Completed' ? ' incomplete' : ' complete')"
+                        :class="['w-5 h-5 mt-0.5 rounded-[4px] border flex items-center justify-center shrink-0 transition-colors', t.status === 'Completed' ? 'bg-[#16a34a] border-[#16a34a] text-white' : 'border-[var(--border-strong)] surface-canvas']"
+                      >
+                        <svg v-if="t.status === 'Completed'" class="w-3.5 h-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                        </svg>
+                      </button>
 
-                  <!-- Scrollable Drop Zone -->
-                  <div :ref="(el) => setColumnRef(col.id, el)" :data-status="col.id"
-                    class="flex-1 overflow-y-auto p-2.5 space-y-2.5 min-h-[100px]">
-                    
-                    <div v-for="task in getColumnTasks(col.id)" :key="task.id" :data-id="task.id"
-                      class="bg-white rounded-xl shadow-sm border border-slate-200/90 hover:shadow-md transition-all cursor-grab active:cursor-grabbing">
-                      
-                      <!-- Card Content -->
-                      <div class="p-3.5" @click="expandCard(task)">
-                        <div class="flex items-center justify-between mb-1.5">
-                          <div class="flex items-center gap-1.5">
-                            <span class="px-2 py-0.5 text-[10px] font-bold uppercase rounded-md border" :class="getPriorityClass(task.priority)">
-                              {{ task.priority }}
-                            </span>
-                            <span v-if="isOverdue(task.due_date, task.status)" class="px-1.5 py-0.5 text-[9px] font-bold uppercase rounded bg-rose-100 text-rose-700 border border-rose-200">
-                              Overdue
-                            </span>
-                          </div>
-                          <span class="text-[11px] text-slate-400 font-medium tabular-nums">#{{ task.id }}</span>
-                        </div>
-                        <h4 class="text-sm font-semibold text-slate-800 leading-snug"
-                          :class="{ 'line-through text-slate-400': task.status === 'Completed' }">
-                          {{ task.title }}
-                        </h4>
-                        <p v-if="task.description" class="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
-                          {{ task.description }}
-                        </p>
-                        <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
-                          <span v-if="task.due_date" class="flex items-center gap-1" :class="{ 'text-rose-600 font-semibold': isOverdue(task.due_date, task.status) }">
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                            {{ task.due_date }}
-                          </span>
-                          <span v-else>No deadline</span>
-                          <span class="text-slate-300">{{ task.created_at ? task.created_at.slice(0, 10) : '' }}</span>
-                        </div>
-                        <div v-if="task.completed_at" class="mt-1.5 text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
-                          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                          Done {{ task.completed_at.slice(0, 10) }}
-                        </div>
-                      </div>
-
-                      <!-- Expanded Inline Edit Form -->
-                      <div v-if="expandedCardId === task.id" class="kanban-no-drag border-t border-slate-200 p-3.5 bg-slate-50/80 rounded-b-xl space-y-2.5 cursor-default" @click.stop>
-                        <input v-model="editingTask.title" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20" placeholder="Task title">
-                        <textarea v-model="editingTask.description" rows="2" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20" placeholder="Description (optional)"></textarea>
-                        <div class="grid grid-cols-2 gap-2">
-                          <select v-model="editingTask.priority" class="px-2 py-1.5 text-xs border border-slate-300 rounded-xl bg-white">
-                            <option value="Low">Low</option>
-                            <option value="Medium">Medium</option>
-                            <option value="High">High</option>
-                          </select>
-                          <input v-model="editingTask.due_date" type="date" class="px-2 py-1.5 text-xs border border-slate-300 rounded-xl bg-white">
-                        </div>
-                        <select v-model="editingTask.status" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-xl bg-white">
-                          <option value="Todo">To Do</option>
-                          <option value="In Progress">In Progress</option>
-                          <option value="Review">Review</option>
-                          <option value="Completed">Done</option>
-                        </select>
-                        <div class="flex items-center justify-between gap-2 pt-1">
+                      <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-2 flex-wrap">
                           <button
                             type="button"
-                            @click.stop="deleteTarget = { type: 'task', id: task.id, title: task.title }"
-                            class="px-2.5 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                            @click="expandCard(t)"
+                            class="text-left text-sm font-semibold hover:text-accent transition-colors"
+                            :class="t.status === 'Completed' ? 'line-through text-muted' : 'text-ink'"
                           >
-                            Delete
+                            {{ t.title }}
                           </button>
-                          <div class="flex gap-1.5">
-                            <button type="button" @click.stop="cancelExpandCard" class="px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50">Cancel</button>
-                            <button type="button" @click.stop="saveExpandedCard(task.id)" class="px-3 py-1.5 text-xs font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-800">Save</button>
+                          <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded-[4px] border uppercase" :class="getPriorityClass(t.priority)">
+                            {{ t.priority }}
+                          </span>
+                          <span v-if="t.status === 'In Progress'" class="text-[10px] font-semibold px-1.5 py-0.5 rounded-[4px] border badge-blue">
+                            In Progress
+                          </span>
+                          <span v-if="t.status === 'Review'" class="text-[10px] font-semibold px-1.5 py-0.5 rounded-[4px] border badge-amber">
+                            Review
+                          </span>
+                          <span v-if="isOverdue(t.due_date, t.status)" class="text-[10px] font-semibold px-1.5 py-0.5 rounded-[4px] border badge-red">
+                            Overdue
+                          </span>
+                        </div>
+
+                        <p v-if="t.description" class="text-xs text-sub mt-1 leading-relaxed">{{ t.description }}</p>
+                        <p v-if="t.due_date" class="text-[11px] text-muted mt-1.5 tabular-nums" :class="{ 'text-st-red font-semibold': isOverdue(t.due_date, t.status) }">
+                          Due: {{ formatDate(t.due_date) }}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div class="flex items-center gap-1 shrink-0">
+                      <button type="button" @click="expandCard(t)" :aria-label="'Edit ' + t.title" class="btn-ghost p-1.5">
+                        <svg class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                      </button>
+                      <button type="button" @click="deleteTarget = { type: 'task', id: t.id, title: t.title }" :aria-label="'Delete ' + t.title" class="btn-ghost p-1.5 hover:text-st-red">
+                        <svg class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Inline Edit Panel for List View -->
+                  <div v-if="expandedCardId === t.id" class="mt-3 ml-8 p-3.5 surface-subtle border hairline rounded-[6px] space-y-2.5 animate-in">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      <input v-model="editingTask.title" aria-label="Task title" class="field-input sm:col-span-2" placeholder="Task title">
+                      <select v-model="editingTask.status" aria-label="Task status" class="field-input font-medium">
+                        <option value="Todo">To Do</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Review">Review</option>
+                        <option value="Completed">Completed</option>
+                      </select>
+                    </div>
+                    <textarea v-model="editingTask.description" aria-label="Task description" rows="2" class="field-input" placeholder="Description (optional)"></textarea>
+                    <div class="flex flex-wrap items-center justify-between gap-2.5">
+                      <div class="flex items-center gap-2">
+                        <select v-model="editingTask.priority" aria-label="Task priority" class="field-input w-auto py-1 text-xs">
+                          <option value="Low">Low Priority</option>
+                          <option value="Medium">Medium Priority</option>
+                          <option value="High">High Priority</option>
+                        </select>
+                        <input v-model="editingTask.due_date" aria-label="Task due date" type="date" class="field-input w-auto py-1 text-xs">
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <button type="button" @click="cancelExpandCard" class="btn-secondary text-xs py-1 px-2.5">Cancel</button>
+                        <button type="button" @click="saveExpandedCard(t.id)" class="btn-primary text-xs py-1 px-3">Save Changes</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Kanban Board View -->
+              <div v-else class="p-4 sm:p-5 overflow-x-auto lg:overflow-x-visible">
+                <div class="flex lg:grid lg:grid-cols-4 items-start gap-3.5 min-h-[460px] snap-x snap-mandatory">
+                  <div
+                    v-for="col in kanbanColumns"
+                    :key="col.id"
+                    class="w-[82vw] sm:w-72 lg:w-auto min-w-0 snap-center shrink-0 surface-subtle border hairline rounded-[8px] flex flex-col max-h-[600px]"
+                  >
+                    <div class="px-3.5 py-2.5 flex items-center justify-between hairline-b">
+                      <div class="flex items-center gap-2">
+                        <span class="status-sq" :class="col.dotClass" aria-hidden="true"></span>
+                        <h3 class="text-xs font-semibold text-ink">{{ col.title }}</h3>
+                      </div>
+                      <span class="text-xs font-semibold text-muted tabular-nums">{{ getColumnTasks(col.id).length }}</span>
+                    </div>
+
+                    <div :ref="(el) => setColumnRef(col.id, el)" :data-status="col.id" class="flex-1 overflow-y-auto p-2.5 space-y-2 min-h-[100px]">
+                      <div
+                        v-for="task in getColumnTasks(col.id)"
+                        :key="task.id"
+                        :data-id="task.id"
+                        class="surface-card hover:border-[var(--border-strong)] transition-colors cursor-grab active:cursor-grabbing"
+                      >
+                        <div class="p-3">
+                          <div class="flex items-center justify-between mb-1.5">
+                            <div class="flex items-center gap-1.5">
+                              <span class="px-1.5 py-0.5 text-[10px] font-semibold uppercase rounded-[4px] border" :class="getPriorityClass(task.priority)">
+                                {{ task.priority }}
+                              </span>
+                              <span v-if="isOverdue(task.due_date, task.status)" class="px-1.5 py-0.5 text-[10px] font-semibold uppercase rounded-[4px] border badge-red">
+                                Overdue
+                              </span>
+                            </div>
+                            <span class="text-[11px] text-muted tabular-nums">#{{ task.id }}</span>
+                          </div>
+                          <button
+                            type="button"
+                            @click="expandCard(task)"
+                            class="text-left text-[13px] font-semibold leading-snug hover:text-accent block w-full"
+                            :class="task.status === 'Completed' ? 'line-through text-muted' : 'text-ink'"
+                          >
+                            {{ task.title }}
+                          </button>
+                          <p v-if="task.description" class="text-xs text-sub mt-1 line-clamp-2 leading-relaxed">{{ task.description }}</p>
+                          <div class="mt-2.5 pt-2 hairline-t flex items-center justify-between text-[11px] text-muted tabular-nums">
+                            <span v-if="task.due_date" :class="{ 'text-st-red font-semibold': isOverdue(task.due_date, task.status) }">
+                              {{ task.due_date }}
+                            </span>
+                            <span v-else>No deadline</span>
+                            <span v-if="task.completed_at" class="text-st-green font-semibold">Done {{ task.completed_at.slice(0, 10) }}</span>
+                          </div>
+                        </div>
+
+                        <!-- Expanded Inline Edit Form -->
+                        <div v-if="expandedCardId === task.id" class="kanban-no-drag hairline-t p-3 surface-subtle rounded-b-[8px] space-y-2 cursor-default" @click.stop>
+                          <input v-model="editingTask.title" aria-label="Task title" class="field-input" placeholder="Task title">
+                          <textarea v-model="editingTask.description" aria-label="Task description" rows="2" class="field-input text-xs" placeholder="Description (optional)"></textarea>
+                          <div class="grid grid-cols-2 gap-2">
+                            <select v-model="editingTask.priority" aria-label="Priority" class="field-input text-xs py-1">
+                              <option value="Low">Low</option>
+                              <option value="Medium">Medium</option>
+                              <option value="High">High</option>
+                            </select>
+                            <input v-model="editingTask.due_date" aria-label="Due date" type="date" class="field-input text-xs py-1">
+                          </div>
+                          <select v-model="editingTask.status" aria-label="Status" class="field-input text-xs py-1">
+                            <option value="Todo">To Do</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Review">Review</option>
+                            <option value="Completed">Done</option>
+                          </select>
+                          <div class="flex items-center justify-between gap-2 pt-1">
+                            <button type="button" @click.stop="deleteTarget = { type: 'task', id: task.id, title: task.title }" class="btn-danger text-xs py-1 px-2">Delete</button>
+                            <div class="flex gap-1.5">
+                              <button type="button" @click.stop="cancelExpandCard" class="btn-secondary text-xs py-1 px-2.5">Cancel</button>
+                              <button type="button" @click.stop="saveExpandedCard(task.id)" class="btn-primary text-xs py-1 px-2.5">Save</button>
+                            </div>
                           </div>
                         </div>
                       </div>
                     </div>
+
+                    <!-- Quick Add Footer -->
+                    <div class="p-2 hairline-t">
+                      <div v-if="quickAddColumn === col.id" class="p-1.5 space-y-2">
+                        <input
+                          :ref="'quickadd_' + col.id"
+                          v-model="quickAddTitle"
+                          aria-label="New task title"
+                          @keyup.enter="submitQuickAdd(col.id)"
+                          @keyup.esc="cancelQuickAdd"
+                          class="field-input"
+                          placeholder="Task title..."
+                        >
+                        <div class="flex gap-1.5">
+                          <button type="button" @click="submitQuickAdd(col.id)" class="btn-primary flex-1 text-xs py-1">Add</button>
+                          <button type="button" @click="cancelQuickAdd" class="btn-secondary text-xs py-1 px-2.5">Cancel</button>
+                        </div>
+                      </div>
+                      <button v-else type="button" @click="openQuickAdd(col.id)" class="btn-ghost w-full justify-start text-xs py-1.5">
+                        <svg class="w-3.5 h-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                        <span>Add Task</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- TAB 2: PAYMENTS -->
+            <div v-else-if="activeTab === 'payments'">
+              <div v-if="showAddPaymentForm" class="p-5 surface-subtle hairline-b animate-in">
+                <h3 class="text-xs font-semibold text-ink mb-3.5">Record New Payment</h3>
+                <div v-if="itemError" class="mb-3 p-2.5 rounded-[6px] border badge-red text-xs">{{ itemError }}</div>
+
+                <form @submit.prevent="handleSavePayment" class="space-y-3.5">
+                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                    <div>
+                      <label for="pay-amount" class="field-label">Amount (IDR) *</label>
+                      <input id="pay-amount" v-model.number="paymentForm.amount" type="number" min="1" required placeholder="5000000" class="field-input tabular-nums font-semibold" />
+                    </div>
+                    <div>
+                      <label for="pay-date" class="field-label">Payment Date</label>
+                      <input id="pay-date" v-model="paymentForm.payment_date" type="date" required class="field-input" />
+                    </div>
+                    <div>
+                      <label for="pay-status" class="field-label">Status</label>
+                      <select id="pay-status" v-model="paymentForm.status" class="field-input">
+                        <option value="Received">Received</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Refunded">Refunded</option>
+                      </select>
+                    </div>
                   </div>
 
-                  <!-- Quick Add Footer -->
-                  <div class="p-2 border-t border-slate-200/60">
-                    <div v-if="quickAddColumn === col.id" class="p-2 space-y-2">
-                      <input :ref="'quickadd_' + col.id" v-model="quickAddTitle" @keyup.enter="submitQuickAdd(col.id)" @keyup.esc="cancelQuickAdd"
-                        class="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20" placeholder="Task title...">
-                      <div class="flex gap-2">
-                        <button @click="submitQuickAdd(col.id)" class="flex-1 py-1.5 text-xs font-bold bg-slate-900 text-white rounded-xl hover:bg-slate-800">Add</button>
-                        <button @click="cancelQuickAdd" class="px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-300 rounded-xl hover:bg-slate-50">Cancel</button>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div>
+                      <label for="pay-method" class="field-label">Payment Method</label>
+                      <select id="pay-method" v-model="paymentForm.payment_method" class="field-input">
+                        <option v-for="m in paymentMethods" :key="m" :value="m">{{ m }}</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label for="pay-notes" class="field-label">Notes / Transaction Ref</label>
+                      <input id="pay-notes" v-model="paymentForm.notes" type="text" placeholder="DP 50%, Invoice #001" class="field-input" />
+                    </div>
+                  </div>
+
+                  <div class="flex items-center justify-end gap-2 pt-1">
+                    <button type="button" @click="showAddPaymentForm = false" class="btn-secondary text-xs">Cancel</button>
+                    <button type="submit" :disabled="itemSubmitting" class="btn-primary text-xs">
+                      <span v-if="itemSubmitting" class="spinner" aria-hidden="true"></span>
+                      <span>Save Payment</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              <div class="divide-hairline">
+                <div v-if="!project.recent_payments || project.recent_payments.length === 0" class="p-10 text-center">
+                  <p class="text-xs font-medium text-sub">No payments recorded yet for this project.</p>
+                  <button type="button" @click="showAddPaymentForm = true" class="btn-secondary text-xs mt-3">Record Payment</button>
+                </div>
+                <div v-for="pay in project.recent_payments" :key="pay.id" class="p-4 row-hover">
+                  <div class="flex items-center justify-between gap-4">
+                    <div>
+                      <div class="flex items-center gap-2.5">
+                        <p class="font-bold text-ink text-sm tabular-nums">{{ formatCurrency(pay.amount) }}</p>
+                        <span class="text-[11px] font-semibold px-2 py-0.5 rounded-[4px] border" :class="getPaymentStatusBadgeClass(pay.status)">
+                          {{ pay.status }}
+                        </span>
+                      </div>
+                      <p class="text-xs text-sub mt-1">
+                        {{ pay.payment_method || 'Payment' }} &bull; {{ formatDate(pay.payment_date) }}
+                        <span v-if="pay.notes" class="text-muted"> &bull; {{ pay.notes }}</span>
+                      </p>
+                    </div>
+
+                    <div class="flex items-center gap-1 shrink-0">
+                      <button type="button" @click="startEditPayment(pay)" aria-label="Edit payment" class="btn-ghost p-1.5">
+                        <svg class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                      </button>
+                      <button type="button" @click="deleteTarget = { type: 'payment', id: pay.id, title: 'Payment of ' + formatCurrency(pay.amount) }" aria-label="Delete payment" class="btn-ghost p-1.5 hover:text-st-red">
+                        <svg class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Inline Edit Payment -->
+                  <div v-if="editingPaymentId === pay.id" class="mt-3 p-3.5 surface-subtle border hairline rounded-[6px] space-y-2.5 animate-in">
+                    <div class="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+                      <input v-model.number="editingPayment.amount" aria-label="Amount" type="number" min="1" class="field-input text-xs font-semibold tabular-nums" placeholder="Amount">
+                      <input v-model="editingPayment.payment_date" aria-label="Payment date" type="date" class="field-input text-xs">
+                      <select v-model="editingPayment.payment_method" aria-label="Payment method" class="field-input text-xs">
+                        <option v-for="m in paymentMethods" :key="m" :value="m">{{ m }}</option>
+                      </select>
+                      <select v-model="editingPayment.status" aria-label="Payment status" class="field-input text-xs font-medium">
+                        <option value="Received">Received</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Refunded">Refunded</option>
+                      </select>
+                    </div>
+                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+                      <input v-model="editingPayment.notes" aria-label="Payment notes" type="text" class="field-input flex-1 text-xs" placeholder="Notes / reference">
+                      <div class="flex items-center justify-end gap-2">
+                        <button type="button" @click="editingPaymentId = null" class="btn-secondary text-xs py-1 px-2.5">Cancel</button>
+                        <button type="button" @click="saveEditPayment(pay.id)" class="btn-primary text-xs py-1 px-3">Save</button>
                       </div>
                     </div>
-                    <button v-else @click="openQuickAdd(col.id)"
-                      class="w-full py-2 px-3 flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 rounded-xl transition-all">
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                      Add Task
-                    </button>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <!-- TAB 2: PAYMENTS -->
-          <div v-else-if="activeTab === 'payments'">
-            <div v-if="showAddPaymentForm" class="p-6 bg-slate-50 border-b border-slate-200 animate-in">
-              <h3 class="text-sm font-bold text-slate-900 mb-4">Record New Payment</h3>
-              <div v-if="itemError" class="mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl">{{ itemError }}</div>
+            <!-- TAB 3: EXPENSES -->
+            <div v-else-if="activeTab === 'expenses'">
+              <div v-if="showAddExpenseForm" class="p-5 surface-subtle hairline-b animate-in">
+                <h3 class="text-xs font-semibold text-ink mb-3.5">Record New Expense</h3>
+                <div v-if="itemError" class="mb-3 p-2.5 rounded-[6px] border badge-red text-xs">{{ itemError }}</div>
 
-              <form @submit.prevent="handleSavePayment" class="space-y-4">
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label class="block text-xs font-semibold uppercase text-slate-700 mb-1">Amount (IDR) *</label>
-                    <input
-                      v-model.number="paymentForm.amount"
-                      type="number"
-                      min="1"
-                      required
-                      placeholder="e.g. 5000000"
-                      class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 tabular-nums font-semibold"
-                    />
-                  </div>
-                  <div>
-                    <label class="block text-xs font-semibold uppercase text-slate-700 mb-1">Payment Date</label>
-                    <input
-                      v-model="paymentForm.payment_date"
-                      type="date"
-                      required
-                      class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                    />
-                  </div>
-                  <div>
-                    <label class="block text-xs font-semibold uppercase text-slate-700 mb-1">Status</label>
-                    <select
-                      v-model="paymentForm.status"
-                      class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                    >
-                      <option value="Received">Received</option>
-                      <option value="Pending">Pending</option>
-                      <option value="Refunded">Refunded</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label class="block text-xs font-semibold uppercase text-slate-700 mb-1">Payment Method</label>
-                    <select
-                      v-model="paymentForm.payment_method"
-                      class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                    >
-                      <option v-for="m in paymentMethods" :key="m" :value="m">{{ m }}</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label class="block text-xs font-semibold uppercase text-slate-700 mb-1">Notes / Transaction Ref</label>
-                    <input
-                      v-model="paymentForm.notes"
-                      type="text"
-                      placeholder="DP 50%, Invoice #001..."
-                      class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                    />
-                  </div>
-                </div>
-
-                <div class="flex items-center justify-end gap-3 pt-2">
-                  <button type="button" @click="showAddPaymentForm = false" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-xl">Cancel</button>
-                  <button type="submit" :disabled="itemSubmitting" class="px-5 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-white text-xs font-semibold rounded-xl shadow-sm flex items-center gap-1.5">
-                    <span v-if="itemSubmitting" class="spinner"></span>
-                    Save Payment
-                  </button>
-                </div>
-              </form>
-            </div>
-
-            <div class="divide-y divide-slate-100">
-              <div v-if="!project.recent_payments || project.recent_payments.length === 0" class="p-12 text-center text-sm text-slate-400">
-                No payments recorded yet for this project.
-              </div>
-              <div
-                v-for="pay in project.recent_payments"
-                :key="pay.id"
-                class="p-4 sm:p-5 hover:bg-slate-50/70 transition-colors"
-              >
-                <div class="flex items-center justify-between gap-4">
-                  <div>
-                    <div class="flex items-center gap-3">
-                      <p class="font-bold text-slate-900 text-base tabular-nums">{{ formatCurrency(pay.amount) }}</p>
-                      <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full border" :class="getPaymentStatusBadgeClass(pay.status)">
-                        {{ pay.status }}
-                      </span>
+                <form @submit.prevent="handleSaveExpense" class="space-y-3.5">
+                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                    <div class="sm:col-span-2">
+                      <label for="exp-desc" class="field-label">Expense Description *</label>
+                      <input id="exp-desc" v-model="expenseForm.description" type="text" required placeholder="Hosting setup, Theme license" class="field-input" />
                     </div>
-                    <p class="text-xs text-slate-500 mt-1">
-                      {{ pay.payment_method || 'Payment' }} &bull; {{ formatDate(pay.payment_date) }}
-                      <span v-if="pay.notes" class="text-slate-400"> &bull; {{ pay.notes }}</span>
-                    </p>
+                    <div>
+                      <label for="exp-cat" class="field-label">Category</label>
+                      <select id="exp-cat" v-model="expenseForm.category" class="field-input">
+                        <option v-for="cat in expenseCategories" :key="cat" :value="cat">{{ cat }}</option>
+                      </select>
+                    </div>
                   </div>
 
-                  <div class="flex items-center gap-1 shrink-0">
-                    <button
-                      @click="startEditPayment(pay)"
-                      aria-label="Edit payment"
-                      class="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg"
-                    >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
-                    </button>
-                    <button
-                      @click="deleteTarget = { type: 'payment', id: pay.id, title: 'Payment of ' + formatCurrency(pay.amount) }"
-                      aria-label="Delete payment"
-                      class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"
-                    >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                    <div>
+                      <label for="exp-amount" class="field-label">Amount (IDR) *</label>
+                      <input id="exp-amount" v-model.number="expenseForm.amount" type="number" min="1" required placeholder="250000" class="field-input tabular-nums font-semibold" />
+                    </div>
+                    <div>
+                      <label for="exp-date" class="field-label">Expense Date</label>
+                      <input id="exp-date" v-model="expenseForm.expense_date" type="date" required class="field-input" />
+                    </div>
+                    <div>
+                      <label for="exp-notes" class="field-label">Notes</label>
+                      <input id="exp-notes" v-model="expenseForm.notes" type="text" placeholder="Vendor or invoice reference" class="field-input" />
+                    </div>
+                  </div>
+
+                  <div class="flex items-center justify-end gap-2 pt-1">
+                    <button type="button" @click="showAddExpenseForm = false" class="btn-secondary text-xs">Cancel</button>
+                    <button type="submit" :disabled="itemSubmitting" class="btn-primary text-xs">
+                      <span v-if="itemSubmitting" class="spinner" aria-hidden="true"></span>
+                      <span>Save Expense</span>
                     </button>
                   </div>
+                </form>
+              </div>
+
+              <div class="divide-hairline">
+                <div v-if="!project.recent_expenses || project.recent_expenses.length === 0" class="p-10 text-center">
+                  <p class="text-xs font-medium text-sub">No expenses recorded yet for this project.</p>
+                  <button type="button" @click="showAddExpenseForm = true" class="btn-secondary text-xs mt-3">Record Expense</button>
                 </div>
+                <div v-for="exp in project.recent_expenses" :key="exp.id" class="p-4 row-hover">
+                  <div class="flex items-center justify-between gap-4">
+                    <div>
+                      <div class="flex items-center gap-2 flex-wrap">
+                        <p class="font-semibold text-ink text-sm">{{ exp.description }}</p>
+                        <span class="text-[11px] font-medium px-2 py-0.5 rounded-[4px] border badge-neutral">{{ exp.category }}</span>
+                      </div>
+                      <p class="text-xs text-sub mt-1">
+                        {{ formatDate(exp.expense_date) }}
+                        <span v-if="exp.notes" class="text-muted"> &bull; {{ exp.notes }}</span>
+                      </p>
+                    </div>
 
-                <!-- Inline Edit Payment -->
-                <div v-if="editingPaymentId === pay.id" class="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3 animate-in">
-                  <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                    <input v-model.number="editingPayment.amount" type="number" min="1" class="px-3 py-1.5 text-xs font-semibold border border-slate-300 rounded-xl bg-white" placeholder="Amount">
-                    <input v-model="editingPayment.payment_date" type="date" class="px-3 py-1.5 text-xs border border-slate-300 rounded-xl bg-white">
-                    <select v-model="editingPayment.payment_method" class="px-3 py-1.5 text-xs border border-slate-300 rounded-xl bg-white">
-                      <option v-for="m in paymentMethods" :key="m" :value="m">{{ m }}</option>
-                    </select>
-                    <select v-model="editingPayment.status" class="px-3 py-1.5 text-xs font-semibold border border-slate-300 rounded-xl bg-white">
-                      <option value="Received">Received</option>
-                      <option value="Pending">Pending</option>
-                      <option value="Refunded">Refunded</option>
-                    </select>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                      <span class="font-bold text-st-red text-sm tabular-nums mr-1">-{{ formatCurrency(exp.amount) }}</span>
+                      <button type="button" @click="startEditExpense(exp)" aria-label="Edit expense" class="btn-ghost p-1.5">
+                        <svg class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                      </button>
+                      <button type="button" @click="deleteTarget = { type: 'expense', id: exp.id, title: exp.description }" aria-label="Delete expense" class="btn-ghost p-1.5 hover:text-st-red">
+                        <svg class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                      </button>
+                    </div>
                   </div>
-                  <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
-                    <input v-model="editingPayment.notes" type="text" class="flex-1 px-3 py-1.5 text-xs border border-slate-300 rounded-xl bg-white" placeholder="Notes / reference">
-                    <div class="flex items-center justify-end gap-2">
-                      <button type="button" @click="editingPaymentId = null" class="px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-300 rounded-xl hover:bg-slate-100">Cancel</button>
-                      <button type="button" @click="saveEditPayment(pay.id)" class="px-4 py-1.5 text-xs font-semibold text-white bg-slate-900 rounded-xl hover:bg-slate-800">Save</button>
+
+                  <!-- Inline Edit Expense -->
+                  <div v-if="editingExpenseId === exp.id" class="mt-3 p-3.5 surface-subtle border hairline rounded-[6px] space-y-2.5 animate-in">
+                    <div class="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+                      <input v-model="editingExpense.description" aria-label="Description" type="text" class="field-input sm:col-span-2 text-xs" placeholder="Description">
+                      <select v-model="editingExpense.category" aria-label="Category" class="field-input text-xs">
+                        <option v-for="cat in expenseCategories" :key="cat" :value="cat">{{ cat }}</option>
+                      </select>
+                      <input v-model.number="editingExpense.amount" aria-label="Amount" type="number" min="1" class="field-input text-xs font-semibold tabular-nums" placeholder="Amount">
+                    </div>
+                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+                      <div class="flex flex-1 gap-2">
+                        <input v-model="editingExpense.expense_date" aria-label="Expense date" type="date" class="field-input w-auto text-xs">
+                        <input v-model="editingExpense.notes" aria-label="Expense notes" type="text" class="field-input flex-1 text-xs" placeholder="Notes">
+                      </div>
+                      <div class="flex items-center justify-end gap-2">
+                        <button type="button" @click="editingExpenseId = null" class="btn-secondary text-xs py-1 px-2.5">Cancel</button>
+                        <button type="button" @click="saveEditExpense(exp.id)" class="btn-primary text-xs py-1 px-3">Save</button>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <!-- TAB 3: EXPENSES -->
-          <div v-else-if="activeTab === 'expenses'">
-            <div v-if="showAddExpenseForm" class="p-6 bg-slate-50 border-b border-slate-200 animate-in">
-              <h3 class="text-sm font-bold text-slate-900 mb-4">Record New Expense</h3>
-              <div v-if="itemError" class="mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl">{{ itemError }}</div>
+            <!-- TAB 4: COMMUNICATIONS -->
+            <div v-else-if="activeTab === 'communications'">
+              <div v-if="showAddCommForm" class="p-5 surface-subtle hairline-b animate-in">
+                <h3 class="text-xs font-semibold text-ink mb-3.5">Log Interaction / Work Update</h3>
+                <div v-if="itemError" class="mb-3 p-2.5 rounded-[6px] border badge-red text-xs">{{ itemError }}</div>
 
-              <form @submit.prevent="handleSaveExpense" class="space-y-4">
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div class="sm:col-span-2">
-                    <label class="block text-xs font-semibold uppercase text-slate-700 mb-1">Expense Description *</label>
-                    <input
-                      v-model="expenseForm.description"
-                      type="text"
-                      required
-                      placeholder="e.g. Hosting setup, Theme license..."
-                      class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                    />
+                <form @submit.prevent="handleSaveComm" class="space-y-3.5">
+                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                    <div>
+                      <label for="comm-type" class="field-label">Channel</label>
+                      <select id="comm-type" v-model="commForm.type" class="field-input">
+                        <option value="whatsapp">WhatsApp</option>
+                        <option value="email">Email</option>
+                        <option value="note">Internal / Work Note</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label for="comm-dir" class="field-label">Direction</label>
+                      <select id="comm-dir" v-model="commForm.direction" class="field-input">
+                        <option value="outgoing">Outgoing</option>
+                        <option value="incoming">Incoming</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label for="comm-subject" class="field-label">Subject</label>
+                      <input id="comm-subject" v-model="commForm.subject" type="text" placeholder="Design revision summary" class="field-input" />
+                    </div>
                   </div>
+
+                  <div v-if="commForm.type !== 'note'">
+                    <label for="comm-contact" class="field-label">Contact Info (Optional)</label>
+                    <input id="comm-contact" v-model="commForm.contact_info" type="text" placeholder="Phone number or email address" class="field-input" />
+                  </div>
+
                   <div>
-                    <label class="block text-xs font-semibold uppercase text-slate-700 mb-1">Category</label>
-                    <select
-                      v-model="expenseForm.category"
-                      class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                    >
-                      <option v-for="cat in expenseCategories" :key="cat" :value="cat">{{ cat }}</option>
-                    </select>
+                    <label for="comm-content" class="field-label">Content &amp; Decisions *</label>
+                    <textarea id="comm-content" v-model="commForm.content" rows="4" required placeholder="Meeting notes, work progress, or client feedback..." class="field-input leading-relaxed"></textarea>
+                  </div>
+
+                  <div class="flex items-center justify-end gap-2 pt-1">
+                    <button type="button" @click="showAddCommForm = false" class="btn-secondary text-xs">Cancel</button>
+                    <button type="submit" :disabled="itemSubmitting" class="btn-primary text-xs">
+                      <span v-if="itemSubmitting" class="spinner" aria-hidden="true"></span>
+                      <span>Save Interaction</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              <div class="divide-hairline">
+                <div v-if="!project.recent_communications || project.recent_communications.length === 0" class="p-10 text-center">
+                  <p class="text-xs font-medium text-sub">No communications logged yet for this project.</p>
+                  <button type="button" @click="showAddCommForm = true" class="btn-secondary text-xs mt-3">Log Interaction</button>
+                </div>
+                <div v-for="comm in project.recent_communications" :key="comm.id" class="p-4 row-hover">
+                  <div class="flex items-start justify-between gap-4">
+                    <div>
+                      <div class="flex items-center gap-2 flex-wrap">
+                        <span class="text-[11px] font-semibold uppercase px-1.5 py-0.5 rounded-[4px] border badge-neutral">{{ comm.type }}</span>
+                        <span class="text-xs text-muted">{{ comm.direction }}</span>
+                        <span v-if="comm.contact_info" class="text-xs text-sub">({{ comm.contact_info }})</span>
+                      </div>
+                      <h4 v-if="comm.subject" class="font-semibold text-ink text-sm mt-1.5">{{ comm.subject }}</h4>
+                      <p class="text-[13px] text-sub mt-1 leading-relaxed whitespace-pre-line">{{ comm.content }}</p>
+                      <p class="text-[11px] text-muted mt-1.5 tabular-nums">{{ formatDateTime(comm.created_at) }}</p>
+                    </div>
+
+                    <button type="button" @click="deleteTarget = { type: 'comm', id: comm.id, title: 'Interaction log' }" aria-label="Delete communication" class="btn-ghost p-1.5 hover:text-st-red shrink-0">
+                      <svg class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    </button>
                   </div>
                 </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label class="block text-xs font-semibold uppercase text-slate-700 mb-1">Amount (IDR) *</label>
-                    <input
-                      v-model.number="expenseForm.amount"
-                      type="number"
-                      min="1"
-                      required
-                      placeholder="e.g. 250000"
-                      class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 tabular-nums font-semibold"
-                    />
-                  </div>
-                  <div>
-                    <label class="block text-xs font-semibold uppercase text-slate-700 mb-1">Expense Date</label>
-                    <input
-                      v-model="expenseForm.expense_date"
-                      type="date"
-                      required
-                      class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                    />
-                  </div>
-                  <div>
-                    <label class="block text-xs font-semibold uppercase text-slate-700 mb-1">Notes</label>
-                    <input
-                      v-model="expenseForm.notes"
-                      type="text"
-                      placeholder="Vendor or invoice note..."
-                      class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                    />
-                  </div>
-                </div>
-
-                <div class="flex items-center justify-end gap-3 pt-2">
-                  <button type="button" @click="showAddExpenseForm = false" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-xl">Cancel</button>
-                  <button type="submit" :disabled="itemSubmitting" class="px-5 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-white text-xs font-semibold rounded-xl shadow-sm flex items-center gap-1.5">
-                    <span v-if="itemSubmitting" class="spinner"></span>
-                    Save Expense
-                  </button>
-                </div>
-              </form>
+              </div>
             </div>
 
-            <div class="divide-y divide-slate-100">
-              <div v-if="!project.recent_expenses || project.recent_expenses.length === 0" class="p-12 text-center text-sm text-slate-400">
-                No expenses recorded yet for this project.
+            <!-- TAB 5: DELIVERABLES & FILES -->
+            <div v-else-if="activeTab === 'files'">
+              <div v-if="showUploadFileForm" class="p-5 surface-subtle hairline-b animate-in">
+                <h3 class="text-xs font-semibold text-ink mb-3">Upload Deliverable / File (Max 10MB)</h3>
+                <div v-if="itemError" class="mb-3 p-2.5 rounded-[6px] border badge-red text-xs">{{ itemError }}</div>
+
+                <div class="flex flex-col sm:flex-row items-center gap-3">
+                  <input
+                    type="file"
+                    aria-label="Select deliverable file"
+                    @change="handleFileChange"
+                    class="block w-full text-xs text-sub file:mr-3 file:py-1.5 file:px-3 file:rounded-[6px] file:border file:border-[var(--border-strong)] file:text-xs file:font-semibold file:bg-[var(--bg-canvas)] file:text-[var(--text-primary)]"
+                  />
+                  <div class="flex items-center gap-2 w-full sm:w-auto shrink-0 justify-end">
+                    <button type="button" @click="showUploadFileForm = false" class="btn-secondary text-xs">Cancel</button>
+                    <button type="button" :disabled="itemSubmitting || !selectedFile" @click="handleUploadFile" class="btn-primary text-xs">
+                      <span v-if="itemSubmitting" class="spinner" aria-hidden="true"></span>
+                      <span>Upload Now</span>
+                    </button>
+                  </div>
+                </div>
               </div>
-              <div
-                v-for="exp in project.recent_expenses"
-                :key="exp.id"
-                class="p-4 sm:p-5 hover:bg-slate-50/70 transition-colors"
-              >
-                <div class="flex items-center justify-between gap-4">
-                  <div>
-                    <div class="flex items-center gap-2.5 flex-wrap">
-                      <p class="font-semibold text-slate-900 text-sm sm:text-base">{{ exp.description }}</p>
-                      <span class="text-xs font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
-                        {{ exp.category }}
-                      </span>
+
+              <div class="divide-hairline">
+                <div v-if="files.length === 0" class="p-10 text-center">
+                  <p class="text-xs font-medium text-sub">No files or deliverables attached to this project yet.</p>
+                  <button type="button" @click="showUploadFileForm = true" class="btn-secondary text-xs mt-3">Upload Deliverable</button>
+                </div>
+                <div v-for="f in files" :key="f.id" class="p-4 flex items-center justify-between row-hover gap-3">
+                  <div class="flex items-center gap-3 min-w-0">
+                    <div class="w-9 h-9 rounded-[6px] surface-subtle border hairline text-sub flex items-center justify-center shrink-0" aria-hidden="true">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                     </div>
-                    <p class="text-xs text-slate-500 mt-1">
-                      {{ formatDate(exp.expense_date) }}
-                      <span v-if="exp.notes" class="text-slate-400"> &bull; {{ exp.notes }}</span>
-                    </p>
+                    <div class="min-w-0">
+                      <a :href="resolveAssetUrl(f.file_url)" target="_blank" rel="noopener" class="font-semibold text-ink hover:text-accent hover:underline text-sm truncate block">{{ f.original_name }}</a>
+                      <p class="text-xs text-muted mt-0.5 tabular-nums">{{ formatFileSize(f.file_size) }} &bull; {{ formatDateTime(f.uploaded_at) }}</p>
+                    </div>
                   </div>
 
                   <div class="flex items-center gap-2 shrink-0">
-                    <span class="font-bold text-rose-600 text-sm sm:text-base tabular-nums mr-1">
-                      -{{ formatCurrency(exp.amount) }}
-                    </span>
-                    <button
-                      @click="startEditExpense(exp)"
-                      aria-label="Edit expense"
-                      class="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg"
-                    >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
-                    </button>
-                    <button
-                      @click="deleteTarget = { type: 'expense', id: exp.id, title: exp.description }"
-                      aria-label="Delete expense"
-                      class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"
-                    >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    <a :href="resolveAssetUrl(f.file_url)" target="_blank" rel="noopener" download class="btn-secondary text-xs py-1 px-2.5">
+                      Download
+                    </a>
+                    <button type="button" @click="deleteTarget = { type: 'file', id: f.id, title: f.original_name }" aria-label="Delete attachment" class="btn-ghost p-1.5 hover:text-st-red">
+                      <svg class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                     </button>
                   </div>
-                </div>
-
-                <!-- Inline Edit Expense -->
-                <div v-if="editingExpenseId === exp.id" class="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3 animate-in">
-                  <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                    <input v-model="editingExpense.description" type="text" class="sm:col-span-2 px-3 py-1.5 text-xs border border-slate-300 rounded-xl bg-white" placeholder="Description">
-                    <select v-model="editingExpense.category" class="px-3 py-1.5 text-xs border border-slate-300 rounded-xl bg-white">
-                      <option v-for="cat in expenseCategories" :key="cat" :value="cat">{{ cat }}</option>
-                    </select>
-                    <input v-model.number="editingExpense.amount" type="number" min="1" class="px-3 py-1.5 text-xs font-semibold border border-slate-300 rounded-xl bg-white" placeholder="Amount">
-                  </div>
-                  <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
-                    <div class="flex flex-1 gap-2">
-                      <input v-model="editingExpense.expense_date" type="date" class="px-3 py-1.5 text-xs border border-slate-300 rounded-xl bg-white">
-                      <input v-model="editingExpense.notes" type="text" class="flex-1 px-3 py-1.5 text-xs border border-slate-300 rounded-xl bg-white" placeholder="Notes">
-                    </div>
-                    <div class="flex items-center justify-end gap-2">
-                      <button type="button" @click="editingExpenseId = null" class="px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-300 rounded-xl hover:bg-slate-100">Cancel</button>
-                      <button type="button" @click="saveEditExpense(exp.id)" class="px-4 py-1.5 text-xs font-semibold text-white bg-slate-900 rounded-xl hover:bg-slate-800">Save</button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- TAB 4: COMMUNICATIONS -->
-          <div v-else-if="activeTab === 'communications'">
-            <div v-if="showAddCommForm" class="p-6 bg-slate-50 border-b border-slate-200 animate-in">
-              <h3 class="text-sm font-bold text-slate-900 mb-4">Log Interaction / Work Update</h3>
-              <div v-if="itemError" class="mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl">{{ itemError }}</div>
-
-              <form @submit.prevent="handleSaveComm" class="space-y-4">
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label class="block text-xs font-semibold uppercase text-slate-700 mb-1">Channel</label>
-                    <select
-                      v-model="commForm.type"
-                      class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                    >
-                      <option value="whatsapp">WhatsApp</option>
-                      <option value="email">Email</option>
-                      <option value="note">Internal / Work Note</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label class="block text-xs font-semibold uppercase text-slate-700 mb-1">Direction</label>
-                    <select
-                      v-model="commForm.direction"
-                      class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                    >
-                      <option value="outgoing">Outgoing</option>
-                      <option value="incoming">Incoming</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label class="block text-xs font-semibold uppercase text-slate-700 mb-1">Subject</label>
-                    <input
-                      v-model="commForm.subject"
-                      type="text"
-                      placeholder="e.g. Design Revision Discussion"
-                      class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                    />
-                  </div>
-                </div>
-
-                <div v-if="commForm.type !== 'note'">
-                  <label class="block text-xs font-semibold uppercase text-slate-700 mb-1">Contact Info (Optional)</label>
-                  <input
-                    v-model="commForm.contact_info"
-                    type="text"
-                    placeholder="Phone number or email address"
-                    class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                  />
-                </div>
-
-                <div>
-                  <label class="block text-xs font-semibold uppercase text-slate-700 mb-1">Content &amp; Decisions *</label>
-                  <textarea
-                    v-model="commForm.content"
-                    rows="4"
-                    required
-                    placeholder="Write detailed notes, meeting minutes, work updates, or client feedback..."
-                    class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 leading-relaxed"
-                  ></textarea>
-                </div>
-
-                <div class="flex items-center justify-end gap-3 pt-2">
-                  <button type="button" @click="showAddCommForm = false" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-xl">Cancel</button>
-                  <button type="submit" :disabled="itemSubmitting" class="px-5 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-white text-xs font-semibold rounded-xl shadow-sm flex items-center gap-1.5">
-                    <span v-if="itemSubmitting" class="spinner"></span>
-                    Save Interaction
-                  </button>
-                </div>
-              </form>
-            </div>
-
-            <div class="divide-y divide-slate-100">
-              <div v-if="!project.recent_communications || project.recent_communications.length === 0" class="p-12 text-center text-sm text-slate-400">
-                No communications logged yet for this project.
-              </div>
-              <div
-                v-for="comm in project.recent_communications"
-                :key="comm.id"
-                class="p-4 sm:p-5 hover:bg-slate-50/70 transition-colors"
-              >
-                <div class="flex items-start justify-between gap-4">
-                  <div>
-                    <div class="flex items-center gap-2 flex-wrap">
-                      <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md bg-slate-900 text-white">
-                        {{ comm.type }}
-                      </span>
-                      <span class="text-xs text-slate-400">{{ comm.direction }}</span>
-                      <span v-if="comm.contact_info" class="text-xs text-slate-500">({{ comm.contact_info }})</span>
-                    </div>
-                    <h4 v-if="comm.subject" class="font-semibold text-slate-900 text-sm mt-2">{{ comm.subject }}</h4>
-                    <p class="text-sm text-slate-700 mt-1 leading-relaxed whitespace-pre-line">{{ comm.content }}</p>
-                    <p class="text-[11px] text-slate-400 mt-2">{{ formatDateTime(comm.created_at) }}</p>
-                  </div>
-
-                  <button
-                    @click="deleteTarget = { type: 'comm', id: comm.id, title: 'Interaction log' }"
-                    aria-label="Delete communication"
-                    class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg shrink-0"
-                  >
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- TAB 5: DELIVERABLES & FILES -->
-          <div v-else-if="activeTab === 'files'">
-            <div v-if="showUploadFileForm" class="p-6 bg-slate-50 border-b border-slate-200 animate-in">
-              <h3 class="text-sm font-bold text-slate-900 mb-3">Upload Deliverable / File (Max 10MB)</h3>
-              <div v-if="itemError" class="mb-3 p-2.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl">{{ itemError }}</div>
-
-              <div class="flex flex-col sm:flex-row items-center gap-3">
-                <input
-                  type="file"
-                  @change="handleFileChange"
-                  class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-slate-900 file:text-white hover:file:bg-slate-800"
-                />
-                <div class="flex items-center gap-2 w-full sm:w-auto shrink-0 justify-end">
-                  <button
-                    type="button"
-                    @click="showUploadFileForm = false"
-                    class="px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-xl"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    :disabled="itemSubmitting || !selectedFile"
-                    @click="handleUploadFile"
-                    class="px-4 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-semibold rounded-xl shadow-sm flex items-center gap-1.5"
-                  >
-                    <span v-if="itemSubmitting" class="spinner"></span>
-                    Upload Now
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div class="divide-y divide-slate-100">
-              <div v-if="files.length === 0" class="p-12 text-center text-sm text-slate-400">
-                No files or deliverables attached to this project yet.
-              </div>
-              <div
-                v-for="f in files"
-                :key="f.id"
-                class="p-4 sm:p-5 flex items-center justify-between hover:bg-slate-50 transition-colors gap-3"
-              >
-                <div class="flex items-center gap-3 min-w-0">
-                  <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 border border-slate-200">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                  </div>
-                  <div class="min-w-0">
-                    <a :href="resolveAssetUrl(f.file_url)" target="_blank" class="font-semibold text-slate-900 hover:underline text-sm truncate block">{{ f.original_name }}</a>
-                    <p class="text-xs text-slate-500 mt-0.5">{{ formatFileSize(f.file_size) }} &bull; {{ formatDateTime(f.uploaded_at) }}</p>
-                  </div>
-                </div>
-
-                <div class="flex items-center gap-2 shrink-0">
-                  <a
-                    :href="resolveAssetUrl(f.file_url)"
-                    target="_blank"
-                    download
-                    class="px-3 py-1.5 text-xs font-semibold bg-white border border-slate-300 hover:bg-slate-50 rounded-xl text-slate-700"
-                  >
-                    Download
-                  </a>
-                  <button
-                    @click="deleteTarget = { type: 'file', id: f.id, title: f.original_name }"
-                    aria-label="Delete attachment"
-                    class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"
-                  >
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                  </button>
                 </div>
               </div>
             </div>
@@ -2245,7 +2028,6 @@ window.ProjectDetailView = {
         </div>
       </div>
 
-      <!-- Delete Project Modal -->
       <confirm-modal
         v-if="showDeleteConfirm"
         title="Delete Project"
@@ -2254,7 +2036,6 @@ window.ProjectDetailView = {
         @cancel="showDeleteConfirm = false"
       />
 
-      <!-- Regenerate Portal Token Modal -->
       <confirm-modal
         v-if="showRegenerateConfirm"
         title="Regenerate Portal Link"
@@ -2265,7 +2046,6 @@ window.ProjectDetailView = {
         @cancel="showRegenerateConfirm = false"
       />
 
-      <!-- Delete Sub-item Modal -->
       <confirm-modal
         v-if="deleteTarget"
         :title="'Delete ' + (deleteTarget.type === 'task' ? 'Task' : deleteTarget.type === 'expense' ? 'Expense' : deleteTarget.type === 'payment' ? 'Payment' : deleteTarget.type === 'file' ? 'Attachment' : 'Log')"

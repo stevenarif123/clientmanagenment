@@ -1,14 +1,22 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full bg-slate-50">
+<html lang="en" class="h-full">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ClientHub - Client &amp; Project Management</title>
+  <title>ClientHub - Client &amp; Project Workspace</title>
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem('clienthub_theme');
+        if (saved === 'dark') document.documentElement.classList.add('dark');
+      } catch (e) {}
+    })();
+  </script>
 
-  <!-- Inter Typography -->
+  <!-- Public Sans Typography -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -18,15 +26,15 @@
       theme: {
         extend: {
           fontFamily: {
-            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif']
+            sans: ['Public Sans', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif']
           },
           colors: {
             brand: {
-              50: '#eef2ff',
-              100: '#e0e7ff',
-              600: '#4f46e5',
-              700: '#4338ca',
-              900: '#0f172a'
+              50: '#eff6ff',
+              100: '#dbeafe',
+              600: '#2563eb',
+              700: '#1d4ed8',
+              900: '#111827'
             }
           }
         }
@@ -43,20 +51,19 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 </head>
-<body class="h-full antialiased text-slate-900">
+<body class="h-full antialiased surface-chrome text-ink">
   <div id="app" v-cloak class="h-full">
     <!-- Toast Notifications Container -->
-    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none max-w-sm w-full px-4 sm:px-0"></div>
+    <div id="toast-container" aria-live="polite" class="fixed bottom-6 right-6 z-[60] flex flex-col gap-3 pointer-events-none max-w-sm w-full px-5 sm:px-0"></div>
 
     <!-- Initial Bootstrapping Loader -->
-    <div v-if="appLoading" class="min-h-screen bg-slate-50 flex flex-col items-center justify-center">
-      <div class="w-11 h-11 rounded-xl bg-slate-900 text-white flex items-center justify-center mb-4 shadow-md">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
-        </svg>
+    <div v-if="appLoading" class="min-h-screen surface-chrome flex flex-col items-center justify-center p-6">
+      <div class="ch-mark w-10 h-10 text-sm mb-5" aria-hidden="true">CH</div>
+      <div class="w-48 space-y-2.5" aria-label="Loading workspace">
+        <div class="skeleton-bar h-2 w-full"></div>
+        <div class="skeleton-bar h-2 w-2/3 mx-auto"></div>
       </div>
-      <div class="spinner spinner-lg text-slate-900"></div>
-      <p class="text-sm font-semibold text-slate-600 mt-4 tracking-tight">Initializing ClientHub...</p>
+      <p class="text-xs font-medium text-sub mt-4">Loading ClientHub workspace...</p>
     </div>
 
     <!-- Guest Screens (Login, Setup, or Not Authenticated) -->
@@ -111,6 +118,13 @@
         currentHashPath() {
           return (this.currentRoute || '#/').split('?')[0];
         },
+        currentQueryTab() {
+          const raw = this.currentRoute || '';
+          const qIndex = raw.indexOf('?');
+          if (qIndex === -1) return null;
+          const params = new URLSearchParams(raw.slice(qIndex + 1));
+          return params.get('tab');
+        },
         isGuestScreen() {
           return this.currentHashPath === '#/login' || this.currentHashPath === '#/setup';
         },
@@ -158,7 +172,11 @@
           const projectDetailMatch = hash.match(/^#\/projects\/(\d+)$/);
           if (projectDetailMatch) {
             const id = parseInt(projectDetailMatch[1], 10);
-            return { component: window.ProjectDetailView, props: { id }, key: `project-detail-${id}` };
+            return {
+              component: window.ProjectDetailView,
+              props: { id, initialTab: this.currentQueryTab || 'tasks' },
+              key: `project-detail-${id}`
+            };
           }
 
           // Task Board Route

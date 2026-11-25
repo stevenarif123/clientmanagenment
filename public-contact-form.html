@@ -4,96 +4,205 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Hubungi Kami / Konsultasi Proyek - ClientHub</title>
+  <script>
+    (function () {
+      try {
+        if (localStorage.getItem('clienthub_theme') === 'dark') {
+          document.documentElement.classList.add('dark');
+        }
+      } catch (e) {}
+    })();
+  </script>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
 
   <style>
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    :root {
+      color-scheme: light;
+      --bg-chrome: #f4f5f7;
+      --bg-canvas: #ffffff;
+      --bg-subtle: #f7f8fa;
+      --border: #e4e6eb;
+      --border-strong: #cbd1da;
+      --text-primary: #111827;
+      --text-secondary: #4b5563;
+      --text-muted: #596370;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --accent-soft: #eff6ff;
+      --ok-bg: #ecfdf5;
+      --ok-border: #a7f3d0;
+      --ok-text: #166534;
+      --err-bg: #fef2f2;
+      --err-border: #fecaca;
+      --err-text: #991b1b;
     }
+    html.dark {
+      color-scheme: dark;
+      --bg-chrome: #0b0d11;
+      --bg-canvas: #141820;
+      --bg-subtle: #1b202b;
+      --border: #262d3b;
+      --border-strong: #374151;
+      --text-primary: #f3f4f6;
+      --text-secondary: #b4bcc8;
+      --text-muted: #939dac;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --accent-soft: rgba(59, 130, 246, 0.16);
+      --ok-bg: rgba(34, 197, 94, 0.16);
+      --ok-border: rgba(74, 222, 128, 0.35);
+      --ok-text: #86efac;
+      --err-bg: rgba(239, 68, 68, 0.16);
+      --err-border: rgba(248, 113, 113, 0.35);
+      --err-text: #fca5a5;
+    }
+    body {
+      font-family: 'Public Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background-color: var(--bg-chrome);
+      color: var(--text-primary);
+    }
+    a[href], button:not(:disabled), select { cursor: pointer; }
+    button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .surface-card {
+      background-color: var(--bg-canvas);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    .ch-mark {
+      display: inline-flex; align-items: center; justify-content: center;
+      background-color: var(--accent); color: #ffffff; font-weight: 700;
+      border-radius: 6px; letter-spacing: -0.03em;
+    }
+    .field-label {
+      display: block; font-size: 12px; font-weight: 600;
+      color: var(--text-secondary); margin-bottom: 6px;
+    }
+    .field-input {
+      width: 100%; background-color: var(--bg-canvas); color: var(--text-primary);
+      border: 1px solid var(--border-strong); border-radius: 6px; padding: 9px 12px;
+      font-size: 13px; transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .field-input::placeholder { color: var(--text-muted); }
+    .field-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+    .field-input option { background-color: var(--bg-canvas); color: var(--text-primary); }
+    .btn-primary {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      background-color: var(--accent); color: #ffffff; border: 1px solid var(--accent);
+      border-radius: 6px; font-size: 13px; font-weight: 600; padding: 10px 16px;
+    }
+    .btn-primary:hover:not(:disabled) { background-color: var(--accent-hover); }
+    .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+    .btn-secondary {
+      display: inline-flex; align-items: center; justify-content: center;
+      background-color: var(--bg-canvas); color: var(--text-primary);
+      border: 1px solid var(--border-strong); border-radius: 6px;
+      font-size: 12px; font-weight: 500; padding: 5px 10px;
+    }
+    .alert-ok { background-color: var(--ok-bg); border: 1px solid var(--ok-border); color: var(--ok-text); border-radius: 6px; }
+    .alert-err { background-color: var(--err-bg); border: 1px solid var(--err-border); color: var(--err-text); border-radius: 6px; }
   </style>
 </head>
-<body class="bg-gradient-to-br from-slate-50 via-white to-indigo-50/40 text-slate-800 p-4 sm:p-8 flex items-center justify-center min-h-screen antialiased">
-  <div class="max-w-lg w-full bg-white rounded-2xl border border-slate-200/80 shadow-xl p-6 sm:p-8">
-    <div class="text-center mb-6">
-      <div class="w-11 h-11 rounded-xl bg-slate-900 text-white flex items-center justify-center mx-auto mb-3 shadow-sm font-bold text-sm">
-        CH
-      </div>
-      <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Konsultasi Proyek</h1>
-      <p class="text-sm text-slate-500 mt-1">Ceritakan kebutuhan website atau software Anda, tim kami akan segera merespons.</p>
+<body class="p-4 sm:p-8 flex flex-col justify-between min-h-screen antialiased">
+  <header class="max-w-lg w-full mx-auto flex items-center justify-between mb-4">
+    <span class="text-xs font-medium" style="color: var(--text-muted);">ClientHub Form</span>
+    <button type="button" id="themeToggle" class="btn-secondary">Dark mode</button>
+  </header>
+
+  <main class="max-w-lg w-full mx-auto surface-card p-6 sm:p-7 my-auto">
+    <div class="mb-6">
+      <div class="ch-mark w-9 h-9 text-xs mb-3" aria-hidden="true">CH</div>
+      <h1 class="text-xl font-bold tracking-tight" style="color: var(--text-primary);">Konsultasi Proyek</h1>
+      <p class="text-[13px] mt-1" style="color: var(--text-secondary);">Ceritakan kebutuhan website atau software Anda, tim kami akan segera merespons.</p>
     </div>
 
-    <div id="alert" class="hidden mb-5 p-3.5 rounded-xl text-sm font-medium"></div>
+    <div id="alert" class="hidden mb-5 p-3.5 text-[13px] font-medium" role="status"></div>
 
     <form id="contactForm" class="space-y-4">
       <div>
-        <label for="name" class="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">Nama Lengkap *</label>
+        <label for="name" class="field-label">Nama Lengkap *</label>
         <input
           type="text"
           id="name"
           required
-          placeholder="Contoh: Budi Santoso"
-          class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-slate-900"
+          placeholder="Nama lengkap Anda"
+          class="field-input"
         />
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label for="email" class="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">Email *</label>
+          <label for="email" class="field-label">Email *</label>
           <input
             type="email"
             id="email"
             required
-            placeholder="budi@example.com"
-            class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-slate-900"
+            placeholder="nama@email.com"
+            class="field-input"
           />
         </div>
         <div>
-          <label for="phone" class="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">No. WhatsApp</label>
+          <label for="phone" class="field-label">No. WhatsApp</label>
           <input
             type="tel"
             id="phone"
-            placeholder="08123456789"
-            class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-slate-900"
+            placeholder="08xxxxxxxxxx"
+            class="field-input"
           />
         </div>
       </div>
 
       <div>
-        <label for="service_id" class="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">Pilihan Layanan</label>
-        <select
-          id="service_id"
-          class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-slate-900"
-        >
+        <label for="service_id" class="field-label">Pilihan Layanan</label>
+        <select id="service_id" class="field-input">
           <option value="">-- Pilih Layanan --</option>
         </select>
       </div>
 
       <div>
-        <label for="message" class="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">Pesan / Kebutuhan Proyek *</label>
+        <label for="message" class="field-label">Pesan / Kebutuhan Proyek *</label>
         <textarea
           id="message"
           rows="4"
           required
-          placeholder="Jelaskan gambaran singkat website yang ingin dibuat, fitur utama, target selesai, dll."
-          class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-slate-900"
+          placeholder="Jelaskan gambaran singkat website atau aplikasi yang ingin dibuat, fitur utama, dan target waktu."
+          class="field-input leading-relaxed"
         ></textarea>
       </div>
 
-      <button
-        type="submit"
-        id="submitBtn"
-        class="w-full py-3 bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-white font-semibold text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
-      >
-        <span>Kirim Pesan Konsultasi &rarr;</span>
+      <button type="submit" id="submitBtn" class="btn-primary w-full">
+        Kirim Pesan Konsultasi
       </button>
     </form>
-  </div>
+  </main>
+
+  <footer class="max-w-lg w-full mx-auto text-center text-xs mt-4" style="color: var(--text-muted);">
+    Powered by ClientHub
+  </footer>
 
   <script>
+    (function () {
+      const toggleBtn = document.getElementById('themeToggle');
+      function syncThemeLabel() {
+        const isDark = document.documentElement.classList.contains('dark');
+        toggleBtn.textContent = isDark ? 'Light mode' : 'Dark mode';
+        toggleBtn.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+      }
+      syncThemeLabel();
+      toggleBtn.addEventListener('click', function () {
+        const nextDark = !document.documentElement.classList.contains('dark');
+        document.documentElement.classList.toggle('dark', nextDark);
+        try { localStorage.setItem('clienthub_theme', nextDark ? 'dark' : 'light'); } catch (e) {}
+        syncThemeLabel();
+      });
+    })();
+
     const apiBase = window.location.pathname.replace(/\/public-contact-form\.html$/i, '').replace(/\/+$/, '') + '/api';
 
     // Load available services dynamically
@@ -139,20 +248,20 @@
         const result = await response.json();
 
         if (response.ok) {
-          alertBox.className = 'mb-5 p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-sm font-medium';
-          alertBox.textContent = 'Pesan Anda berhasil terkirim! Tim kami akan segera menghubungi Anda.';
+          alertBox.className = 'mb-5 p-3.5 alert-ok text-[13px] font-medium';
+          alertBox.textContent = 'Pesan Anda berhasil terkirim. Tim kami akan segera menghubungi Anda.';
           document.getElementById('contactForm').reset();
         } else {
           const firstFieldErr = result.errors ? Object.values(result.errors)[0] : '';
-          alertBox.className = 'mb-5 p-3.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-sm font-medium';
+          alertBox.className = 'mb-5 p-3.5 alert-err text-[13px] font-medium';
           alertBox.textContent = firstFieldErr || result.message || 'Terjadi kendala saat mengirim pesan.';
         }
       } catch (err) {
-        alertBox.className = 'mb-5 p-3.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-sm font-medium';
+        alertBox.className = 'mb-5 p-3.5 alert-err text-[13px] font-medium';
         alertBox.textContent = 'Gagal terhubung ke server.';
       } finally {
         btn.disabled = false;
-        btn.textContent = 'Kirim Pesan Konsultasi \u2192';
+        btn.textContent = 'Kirim Pesan Konsultasi';
       }
     });
   </script>

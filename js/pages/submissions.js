@@ -10,6 +10,7 @@ window.SubmissionsView = {
   data() {
     return {
       loading: true,
+      error: '',
       submissions: [],
       total: 0,
       page: 1,
@@ -35,6 +36,9 @@ window.SubmissionsView = {
         const hay = `${s.name || ''} ${s.email || ''} ${s.phone || ''} ${s.message || ''} ${s.service_name || ''}`.toLowerCase();
         return hay.includes(q);
       });
+    },
+    publicFormUrl() {
+      return window.Utils.resolveAssetUrl('public-contact-form.html');
     }
   },
   async mounted() {
@@ -53,6 +57,7 @@ window.SubmissionsView = {
   methods: {
     async fetchSubmissions() {
       this.loading = true;
+      this.error = '';
       try {
         const response = await window.API.submissions.getAll({
           page: this.page,
@@ -63,10 +68,18 @@ window.SubmissionsView = {
         this.submissions = response.data?.data || [];
         this.total = response.data?.meta?.total ?? this.submissions.length;
       } catch (err) {
+        this.error = 'Failed to load contact submissions.';
         window.Utils.toast('Failed to load submissions', 'error');
       } finally {
         this.loading = false;
       }
+    },
+    clearFilters() {
+      this.statusFilter = '';
+      this.searchQuery = '';
+      this.showDuplicates = false;
+      this.page = 1;
+      this.fetchSubmissions();
     },
     handlePageChange(newPage) {
       this.page = newPage;
@@ -107,7 +120,7 @@ window.SubmissionsView = {
           company: this.convertCompany,
           address: this.convertAddress
         });
-        window.Utils.toast('Lead converted to client successfully!', 'success');
+        window.Utils.toast('Lead converted to client successfully', 'success');
         this.showConvertModal = false;
         this.showDetailModal = false;
         await this.fetchSubmissions();
@@ -147,294 +160,368 @@ window.SubmissionsView = {
     }
   },
   template: `
-    <div>
-      <!-- Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-        <div>
-          <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Contact Inquiries</h1>
-          <p class="text-sm text-slate-500 mt-0.5">Review website submissions, follow up leads, and convert to clients</p>
+    <div class="flex flex-col min-h-full">
+      <!-- Slim Page Header -->
+      <div class="min-h-[44px] px-5 sm:px-6 py-2 hairline-b flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-2.5">
+          <h1 class="text-sm font-semibold text-ink tracking-tight">Contact Inquiries</h1>
+          <span class="text-xs text-muted tabular-nums">{{ total }} total</span>
         </div>
+        <a :href="publicFormUrl" target="_blank" rel="noopener" class="btn-secondary text-xs py-1 px-2.5">
+          Open Contact Form
+        </a>
       </div>
 
-      <!-- Filter Controls -->
-      <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div class="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+      <!-- Filter Strip -->
+      <div class="px-5 sm:px-6 py-3 hairline-b surface-subtle flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
           <div class="relative w-full sm:w-64">
-            <svg class="w-4 h-4 text-slate-400 absolute left-3.5 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <svg class="w-3.5 h-3.5 text-muted absolute left-2.5 top-1/2 -translate-y-1/2" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
             <input
               v-model="searchQuery"
               type="text"
+              aria-label="Filter submissions on page"
               placeholder="Filter current page..."
-              class="w-full pl-10 pr-4 py-2 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-slate-900"
+              class="field-input pl-8 py-1.5 text-xs"
             />
           </div>
 
           <select
             v-model="statusFilter"
             @change="page = 1; fetchSubmissions();"
-            class="px-3 py-2 text-sm border border-slate-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-slate-900"
+            aria-label="Filter by submission status"
+            class="field-input w-auto py-1.5 text-xs font-medium"
           >
             <option value="">All Statuses</option>
             <option v-for="s in statuses" :key="s" :value="s">{{ s }}</option>
           </select>
 
-          <label class="flex items-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer select-none">
+          <label for="sub-show-dups" class="flex items-center gap-2 text-xs font-medium text-sub select-none">
             <input
+              id="sub-show-dups"
               v-model="showDuplicates"
               @change="page = 1; fetchSubmissions();"
               type="checkbox"
-              class="rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+              class="rounded border-[var(--border-strong)]"
             />
-            Show duplicates
+            <span>Show duplicates</span>
           </label>
         </div>
 
-        <div class="text-xs text-slate-500 font-medium">
-          Showing {{ visibleSubmissions.length }} of {{ total }} inquiries
+        <span class="text-xs text-muted tabular-nums">
+          Showing {{ visibleSubmissions.length }} of {{ total }}
+        </span>
+      </div>
+
+      <div class="p-5 sm:p-6">
+        <!-- Skeleton Loading -->
+        <div v-if="loading" class="surface-card overflow-hidden">
+          <div class="p-4 space-y-3">
+            <div v-for="n in 5" :key="'sub-sk-' + n" class="flex items-center justify-between gap-4">
+              <div class="skeleton-bar h-4 w-48"></div>
+              <div class="skeleton-bar h-4 w-28"></div>
+              <div class="skeleton-bar h-4 w-20"></div>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <!-- Loading State -->
-      <div v-if="loading" class="py-20 flex flex-col items-center justify-center">
-        <div class="spinner spinner-lg text-slate-900"></div>
-        <p class="text-sm text-slate-500 mt-3">Loading inquiries...</p>
-      </div>
-
-      <!-- Empty State -->
-      <div v-else-if="visibleSubmissions.length === 0" class="bg-white rounded-2xl border border-slate-200/80 p-12 text-center shadow-sm">
-        <div class="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>
+        <!-- Error State -->
+        <div v-else-if="error" class="surface-card p-5 border-[var(--st-red-border)] flex items-center justify-between gap-4">
+          <p class="text-sm font-medium text-st-red">{{ error }}</p>
+          <button type="button" @click="fetchSubmissions" class="btn-secondary">Retry</button>
         </div>
-        <h3 class="text-base font-bold text-slate-900">No submissions found</h3>
-        <p class="text-sm text-slate-500 mt-1">Inquiries from your website contact form will appear here.</p>
-      </div>
 
-      <!-- Submissions List -->
-      <div v-else class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden animate-in">
-        <div class="overflow-x-auto">
-          <table class="w-full text-left border-collapse">
-            <thead>
-              <tr class="border-b border-slate-100 bg-slate-50/75 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                <th class="py-3.5 px-6">Sender Details</th>
-                <th class="py-3.5 px-6">Quick Contact</th>
-                <th class="py-3.5 px-6">Service Requested</th>
-                <th class="py-3.5 px-6">Date</th>
-                <th class="py-3.5 px-6">Status</th>
-                <th class="py-3.5 px-6 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100 text-sm">
-              <tr
-                v-for="sub in visibleSubmissions"
-                :key="sub.id"
-                @click="openDetail(sub)"
-                class="hover:bg-slate-50/80 transition-colors cursor-pointer"
-              >
-                <td class="py-4 px-6">
-                  <div class="flex items-center gap-2 flex-wrap">
-                    <span class="font-bold text-slate-900">{{ sub.name }}</span>
-                    <span v-if="sub.has_duplicate_warning" class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                      Duplicate Match
-                    </span>
-                  </div>
-                  <p class="text-xs text-slate-500 mt-1 line-clamp-1 italic">"{{ sub.message || 'No message' }}"</p>
-                </td>
-                <td class="py-4 px-6" @click.stop>
-                  <div class="flex items-center gap-2">
-                    <a
-                      v-if="sub.phone"
-                      :href="getWhatsAppUrl(sub.phone, sub.name)"
-                      target="_blank"
-                      class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs font-semibold border border-emerald-200 transition-colors"
-                      title="Follow up via WhatsApp"
-                    >
-                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
-                      WA
-                    </a>
-                    <a
-                      v-if="sub.email"
-                      :href="getMailtoUrl(sub.email, sub.name)"
-                      class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-semibold border border-blue-200 transition-colors"
-                      title="Reply via Email"
-                    >
-                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                      Email
-                    </a>
-                  </div>
-                </td>
-                <td class="py-4 px-6 text-slate-700 font-medium">
-                  {{ sub.service_name || 'General Inquiry' }}
-                </td>
-                <td class="py-4 px-6 text-slate-500 text-xs whitespace-nowrap">
-                  {{ formatDateTime(sub.created_at) }}
-                </td>
-                <td class="py-4 px-6" @click.stop>
-                  <select
-                    :value="sub.status"
-                    @change="updateStatus(sub, $event.target.value)"
-                    class="text-xs font-semibold px-2.5 py-1 rounded-full border bg-white focus:outline-none"
-                    :class="getSubmissionStatusBadgeClass(sub.status)"
-                  >
-                    <option v-for="s in statuses" :key="s" :value="s">{{ s }}</option>
-                  </select>
-                </td>
-                <td class="py-4 px-6 text-right space-x-2 whitespace-nowrap" @click.stop>
-                  <button
-                    v-if="sub.status !== 'Converted'"
-                    @click="openConvert(sub)"
-                    class="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-semibold rounded-lg transition-colors"
-                  >
-                    Convert to Client
+        <!-- Empty State -->
+        <div v-else-if="visibleSubmissions.length === 0" class="surface-card p-10 text-center">
+          <h2 class="text-sm font-semibold text-ink">No submissions found</h2>
+          <p class="text-xs text-sub mt-1">
+            {{ (statusFilter || searchQuery) ? 'Try clearing the active search or status filter.' : 'Website leads submitted through your public contact form will appear here.' }}
+          </p>
+          <div class="mt-4 flex items-center justify-center gap-2">
+            <button v-if="statusFilter || searchQuery" type="button" @click="clearFilters" class="btn-secondary text-xs">Clear Filters</button>
+            <a :href="publicFormUrl" target="_blank" rel="noopener" class="btn-secondary text-xs">Preview Contact Form</a>
+          </div>
+        </div>
+
+        <!-- Submissions Container -->
+        <div v-else class="surface-card overflow-hidden animate-in">
+          <!-- Mobile List -->
+          <div class="md:hidden divide-hairline">
+            <div
+              v-for="sub in visibleSubmissions"
+              :key="'m-sub-' + sub.id"
+              class="p-4 space-y-2.5"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <button type="button" @click="openDetail(sub)" class="text-sm font-semibold text-ink hover:text-accent text-left truncate block">
+                    {{ sub.name }}
                   </button>
-                  <a
-                    v-else-if="sub.converted_client_id"
-                    :href="'#/clients/' + sub.converted_client_id"
-                    class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg inline-block transition-colors"
-                  >
-                    View Client &rarr;
+                  <p class="text-xs text-muted mt-0.5">{{ sub.service_name || 'General Inquiry' }}</p>
+                </div>
+                <select
+                  :value="sub.status"
+                  @change="updateStatus(sub, $event.target.value)"
+                  :aria-label="'Status for ' + sub.name"
+                  class="text-[11px] font-semibold px-2 py-1 rounded-[4px] border shrink-0"
+                  :class="getSubmissionStatusBadgeClass(sub.status)"
+                >
+                  <option v-for="s in statuses" :key="s" :value="s">{{ s }}</option>
+                </select>
+              </div>
+              <p class="text-xs text-sub line-clamp-2">{{ sub.message || 'No message provided' }}</p>
+              <div class="flex items-center justify-between gap-2 pt-1">
+                <div class="flex items-center gap-2">
+                  <a v-if="sub.phone" :href="getWhatsAppUrl(sub.phone, sub.name)" target="_blank" rel="noopener" class="btn-secondary text-xs py-1 px-2">WA</a>
+                  <a v-if="sub.email" :href="getMailtoUrl(sub.email, sub.name)" class="btn-secondary text-xs py-1 px-2">Email</a>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <button v-if="sub.status !== 'Converted'" type="button" @click="openConvert(sub)" class="btn-primary text-xs py-1 px-2.5">
+                    Convert
+                  </button>
+                  <a v-else-if="sub.converted_client_id" :href="'#/clients/' + sub.converted_client_id" class="btn-secondary text-xs py-1 px-2.5">
+                    Client
                   </a>
-                  <button
-                    @click="deleteTarget = sub"
-                    aria-label="Delete submission"
-                    class="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg"
-                  >
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                  <button type="button" @click="deleteTarget = sub" aria-label="Delete submission" class="btn-ghost p-1.5 hover:text-st-red">
+                    <svg class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                   </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+                </div>
+              </div>
+            </div>
+          </div>
 
-        <!-- Pagination -->
-        <pagination
-          :page="page"
-          :total="total"
-          :per-page="perPage"
-          @change="handlePageChange"
-        />
+          <!-- Desktop Table -->
+          <div class="hidden md:block overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="hairline-b surface-subtle text-xs font-semibold text-sub">
+                  <th class="py-2.5 px-4">Sender</th>
+                  <th class="py-2.5 px-4">Quick Contact</th>
+                  <th class="py-2.5 px-4">Requested Service</th>
+                  <th class="py-2.5 px-4">Received</th>
+                  <th class="py-2.5 px-4">Status</th>
+                  <th class="py-2.5 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="divide-hairline text-[13px]">
+                <tr
+                  v-for="sub in visibleSubmissions"
+                  :key="sub.id"
+                  class="row-hover"
+                >
+                  <td class="py-3 px-4">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <button type="button" @click="openDetail(sub)" class="font-semibold text-ink hover:text-accent hover:underline text-left">
+                        {{ sub.name }}
+                      </button>
+                      <span v-if="sub.has_duplicate_warning" class="px-1.5 py-0.5 rounded-[4px] border text-[10px] font-semibold badge-amber">
+                        Duplicate Match
+                      </span>
+                    </div>
+                    <p class="text-xs text-muted mt-0.5 line-clamp-1">{{ sub.message || 'No message' }}</p>
+                  </td>
+                  <td class="py-3 px-4">
+                    <div class="flex items-center gap-1.5">
+                      <a
+                        v-if="sub.phone"
+                        :href="getWhatsAppUrl(sub.phone, sub.name)"
+                        target="_blank"
+                        rel="noopener"
+                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-[4px] border text-xs font-medium badge-green"
+                        title="Follow up via WhatsApp"
+                      >
+                        WA
+                      </a>
+                      <a
+                        v-if="sub.email"
+                        :href="getMailtoUrl(sub.email, sub.name)"
+                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-[4px] border text-xs font-medium badge-blue"
+                        title="Reply via Email"
+                      >
+                        Email
+                      </a>
+                    </div>
+                  </td>
+                  <td class="py-3 px-4 text-sub font-medium">
+                    {{ sub.service_name || 'General Inquiry' }}
+                  </td>
+                  <td class="py-3 px-4 text-muted text-xs whitespace-nowrap tabular-nums">
+                    {{ formatDateTime(sub.created_at) }}
+                  </td>
+                  <td class="py-3 px-4">
+                    <select
+                      :value="sub.status"
+                      @change="updateStatus(sub, $event.target.value)"
+                      :aria-label="'Update status for ' + sub.name"
+                      class="text-xs font-semibold px-2 py-0.5 rounded-[4px] border"
+                      :class="getSubmissionStatusBadgeClass(sub.status)"
+                    >
+                      <option v-for="s in statuses" :key="s" :value="s">{{ s }}</option>
+                    </select>
+                  </td>
+                  <td class="py-3 px-4 text-right space-x-1.5 whitespace-nowrap">
+                    <button
+                      type="button"
+                      @click="openDetail(sub)"
+                      class="btn-ghost text-xs py-1 px-2"
+                    >
+                      Inspect
+                    </button>
+                    <button
+                      v-if="sub.status !== 'Converted'"
+                      type="button"
+                      @click="openConvert(sub)"
+                      class="btn-secondary text-xs py-1 px-2.5"
+                    >
+                      Convert to Client
+                    </button>
+                    <a
+                      v-else-if="sub.converted_client_id"
+                      :href="'#/clients/' + sub.converted_client_id"
+                      class="btn-secondary text-xs py-1 px-2.5"
+                    >
+                      View Client
+                    </a>
+                    <button
+                      type="button"
+                      @click="deleteTarget = sub"
+                      :aria-label="'Delete submission from ' + sub.name"
+                      class="btn-ghost p-1.5 hover:text-st-red"
+                    >
+                      <svg class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination -->
+          <pagination
+            :page="page"
+            :total="total"
+            :per-page="perPage"
+            @change="handlePageChange"
+          />
+        </div>
       </div>
 
       <!-- Detail Modal -->
-      <div v-if="showDetailModal && selectedSubmission" class="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div v-if="showDetailModal && selectedSubmission" class="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Inquiry Details">
         <div @click="showDetailModal = false" class="fixed inset-0 modal-backdrop"></div>
-        <div class="relative bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full p-6 z-10 animate-in max-h-[90vh] overflow-y-auto">
-          <div class="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
-            <h3 class="text-lg font-bold text-slate-900">Inquiry Details</h3>
-            <button @click="showDetailModal = false" aria-label="Close modal" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        <div class="relative surface-popover max-w-lg w-full p-5 z-10 animate-in max-h-[90vh] overflow-y-auto">
+          <div class="flex items-center justify-between pb-3.5 hairline-b mb-4">
+            <h3 class="text-sm font-semibold text-ink">Inquiry Details</h3>
+            <button type="button" @click="showDetailModal = false" aria-label="Close inquiry details" class="btn-ghost p-1">
+              <svg class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
           </div>
 
-          <div class="space-y-4 text-sm">
+          <div class="space-y-4 text-[13px]">
             <div>
-              <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Sender</p>
-              <p class="text-base font-bold text-slate-900 mt-0.5">{{ selectedSubmission.name }}</p>
+              <p class="text-xs font-medium text-muted">Sender</p>
+              <p class="text-base font-bold text-ink mt-0.5">{{ selectedSubmission.name }}</p>
               <div class="flex items-center gap-3 mt-1 text-xs">
-                <a v-if="selectedSubmission.email" :href="getMailtoUrl(selectedSubmission.email, selectedSubmission.name)" class="text-blue-600 hover:underline">{{ selectedSubmission.email }}</a>
-                <span v-if="selectedSubmission.phone">&bull;</span>
-                <a v-if="selectedSubmission.phone" :href="getWhatsAppUrl(selectedSubmission.phone, selectedSubmission.name)" target="_blank" class="text-emerald-600 hover:underline">{{ selectedSubmission.phone }}</a>
+                <a v-if="selectedSubmission.email" :href="getMailtoUrl(selectedSubmission.email, selectedSubmission.name)" class="text-accent hover:underline">{{ selectedSubmission.email }}</a>
+                <span v-if="selectedSubmission.phone" class="text-muted">|</span>
+                <a v-if="selectedSubmission.phone" :href="getWhatsAppUrl(selectedSubmission.phone, selectedSubmission.name)" target="_blank" rel="noopener" class="text-st-green hover:underline">{{ selectedSubmission.phone }}</a>
               </div>
             </div>
 
-            <div v-if="selectedSubmission.duplicate_warnings && selectedSubmission.duplicate_warnings.length > 0" class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 space-y-1">
-              <p class="font-bold">Possible Duplicate Matches Detected:</p>
+            <div v-if="selectedSubmission.duplicate_warnings && selectedSubmission.duplicate_warnings.length > 0" class="p-3 rounded-[6px] border badge-amber text-xs space-y-1">
+              <p class="font-semibold">Possible Duplicate Matches Detected:</p>
               <ul class="list-disc pl-4 space-y-0.5">
                 <li v-for="w in selectedSubmission.duplicate_warnings" :key="w.id">
                   <span v-if="w.client_name">Existing client: <strong>{{ w.client_name }}</strong> ({{ w.client_email }})</span>
                   <span v-else-if="w.submission_name">Previous submission: <strong>{{ w.submission_name }}</strong> ({{ w.submission_email }})</span>
-                  &mdash; matched by {{ w.match_type }}
+                  : matched by {{ w.match_type }}
                 </li>
               </ul>
             </div>
 
             <div>
-              <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Requested Service</p>
-              <p class="font-medium text-slate-800 mt-0.5">{{ selectedSubmission.service_name || 'General Inquiry' }}</p>
+              <p class="text-xs font-medium text-muted">Requested Service</p>
+              <p class="font-medium text-ink mt-0.5">{{ selectedSubmission.service_name || 'General Inquiry' }}</p>
             </div>
 
             <div>
-              <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Message</p>
-              <div class="mt-1 p-4 bg-slate-50 rounded-xl text-slate-700 border border-slate-200/60 whitespace-pre-line leading-relaxed">
+              <p class="text-xs font-medium text-muted">Message</p>
+              <div class="mt-1 p-3.5 surface-subtle rounded-[6px] border hairline text-ink whitespace-pre-line leading-relaxed">
                 {{ selectedSubmission.message || 'No message provided' }}
               </div>
             </div>
 
             <div>
-              <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Received On</p>
-              <p class="text-xs text-slate-600 mt-0.5">{{ formatDateTime(selectedSubmission.created_at) }}</p>
+              <p class="text-xs font-medium text-muted">Received On</p>
+              <p class="text-xs text-sub mt-0.5 tabular-nums">{{ formatDateTime(selectedSubmission.created_at) }}</p>
             </div>
           </div>
 
-          <div class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
-            <button
-              type="button"
-              @click="showDetailModal = false"
-              class="px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-xl"
-            >
-              Close
-            </button>
+          <div class="mt-5 pt-4 hairline-t flex items-center justify-between gap-2">
+            <button type="button" @click="showDetailModal = false" class="btn-secondary">Close</button>
             <button
               v-if="selectedSubmission.status !== 'Converted'"
               type="button"
               @click="openConvert(selectedSubmission)"
-              class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow-sm"
+              class="btn-primary"
             >
-              Convert to Client Profile &rarr;
+              Convert to Client Profile
             </button>
             <a
               v-else-if="selectedSubmission.converted_client_id"
               :href="'#/clients/' + selectedSubmission.converted_client_id"
               @click="showDetailModal = false"
-              class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-xl shadow-sm"
+              class="btn-primary"
             >
-              Open Client Profile &rarr;
+              Open Client Profile
             </a>
           </div>
         </div>
       </div>
 
       <!-- Convert to Client Modal -->
-      <div v-if="showConvertModal && selectedSubmission" class="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div v-if="showConvertModal && selectedSubmission" class="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Convert Lead to Client">
         <div @click="showConvertModal = false" class="fixed inset-0 modal-backdrop"></div>
-        <div class="relative bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full p-6 z-10 animate-in">
-          <div class="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
-            <h3 class="text-lg font-bold text-slate-900">Convert Lead to Client</h3>
-            <button @click="showConvertModal = false" aria-label="Close modal" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        <div class="relative surface-popover max-w-md w-full p-5 z-10 animate-in">
+          <div class="flex items-center justify-between pb-3.5 hairline-b mb-4">
+            <h3 class="text-sm font-semibold text-ink">Convert Lead to Client</h3>
+            <button type="button" @click="showConvertModal = false" aria-label="Close convert dialog" class="btn-ghost p-1">
+              <svg class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
           </div>
 
-          <div class="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl mb-4">
+          <div class="p-3 rounded-[6px] border badge-green text-xs mb-4">
             Creating client profile for <strong>{{ selectedSubmission.name }}</strong> ({{ selectedSubmission.email }}).
           </div>
 
           <form @submit.prevent="executeConvert" class="space-y-4">
             <div>
-              <label class="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">Company (Optional)</label>
+              <label for="convert-company" class="field-label">Company (Optional)</label>
               <input
+                id="convert-company"
                 v-model="convertCompany"
                 type="text"
-                class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-slate-900"
-                placeholder="Company / Organization Name"
+                class="field-input"
+                placeholder="Company or organization name"
               />
             </div>
 
             <div>
-              <label class="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">Address (Optional)</label>
+              <label for="convert-address" class="field-label">Address (Optional)</label>
               <textarea
+                id="convert-address"
                 v-model="convertAddress"
                 rows="2"
-                class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-slate-900"
-                placeholder="Client address..."
+                class="field-input"
+                placeholder="Street, city, or billing address"
               ></textarea>
             </div>
 
-            <div class="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
-              <button type="button" @click="showConvertModal = false" class="px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-xl">Cancel</button>
-              <button type="submit" :disabled="convertLoading" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white text-sm font-semibold rounded-xl shadow-sm flex items-center gap-2">
-                <span v-if="convertLoading" class="spinner"></span>
-                Create Client Record
+            <div class="pt-4 hairline-t flex items-center justify-end gap-2">
+              <button type="button" @click="showConvertModal = false" class="btn-secondary">Cancel</button>
+              <button type="submit" :disabled="convertLoading" class="btn-primary">
+                <span v-if="convertLoading" class="spinner" aria-hidden="true"></span>
+                <span>Create Client Record</span>
               </button>
             </div>
           </form>

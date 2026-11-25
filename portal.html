@@ -1,14 +1,23 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full bg-slate-50">
+<html lang="en" class="h-full">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Client Portal - Project Progress &amp; Deliverables</title>
+  <script>
+    (function () {
+      try {
+        if (localStorage.getItem('clienthub_theme') === 'dark') {
+          document.documentElement.classList.add('dark');
+        }
+      } catch (e) {}
+    })();
+  </script>
 
-  <!-- Inter Font -->
+  <!-- Public Sans Font -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -17,297 +26,416 @@
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 
   <style>
+    :root {
+      color-scheme: light;
+      --bg-chrome: #f4f5f7;
+      --bg-canvas: #ffffff;
+      --bg-subtle: #f7f8fa;
+      --border: #e4e6eb;
+      --border-strong: #cbd1da;
+      --text-primary: #111827;
+      --text-secondary: #4b5563;
+      --text-muted: #596370;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --st-neutral-dot: #6b7280;
+      --st-neutral-bg: #f3f4f6;
+      --st-neutral-border: #d1d5db;
+      --st-neutral-text: #374151;
+      --st-blue-dot: #2563eb;
+      --st-blue-bg: #eff6ff;
+      --st-blue-border: #bfdbfe;
+      --st-blue-text: #1d4ed8;
+      --st-amber-dot: #d97706;
+      --st-amber-bg: #fffbeb;
+      --st-amber-border: #fde68a;
+      --st-amber-text: #92400e;
+      --st-green-dot: #16a34a;
+      --st-green-bg: #ecfdf5;
+      --st-green-border: #a7f3d0;
+      --st-green-text: #166534;
+      --st-red-dot: #dc2626;
+      --st-red-bg: #fef2f2;
+      --st-red-border: #fecaca;
+      --st-red-text: #991b1b;
+      --skeleton-base: #e9ecf1;
+    }
+    html.dark {
+      color-scheme: dark;
+      --bg-chrome: #0b0d11;
+      --bg-canvas: #141820;
+      --bg-subtle: #1b202b;
+      --border: #262d3b;
+      --border-strong: #374151;
+      --text-primary: #f3f4f6;
+      --text-secondary: #b4bcc8;
+      --text-muted: #939dac;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --st-neutral-dot: #9ca3af;
+      --st-neutral-bg: rgba(148, 163, 184, 0.14);
+      --st-neutral-border: rgba(148, 163, 184, 0.3);
+      --st-neutral-text: #d1d5db;
+      --st-blue-dot: #60a5fa;
+      --st-blue-bg: rgba(59, 130, 246, 0.16);
+      --st-blue-border: rgba(96, 165, 250, 0.35);
+      --st-blue-text: #93c5fd;
+      --st-amber-dot: #fbbf24;
+      --st-amber-bg: rgba(245, 158, 11, 0.16);
+      --st-amber-border: rgba(251, 191, 36, 0.35);
+      --st-amber-text: #fcd34d;
+      --st-green-dot: #4ade80;
+      --st-green-bg: rgba(34, 197, 94, 0.16);
+      --st-green-border: rgba(74, 222, 128, 0.35);
+      --st-green-text: #86efac;
+      --st-red-dot: #f87171;
+      --st-red-bg: rgba(239, 68, 68, 0.16);
+      --st-red-border: rgba(248, 113, 113, 0.35);
+      --st-red-text: #fca5a5;
+      --skeleton-base: #232a38;
+    }
     [v-cloak] { display: none; }
     body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: 'Public Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background-color: var(--bg-chrome);
+      color: var(--text-primary);
     }
-    .spinner {
-      border: 2px solid rgba(226, 232, 240, 0.8);
-      border-top-color: #0f172a;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
+    a[href], button:not(:disabled) { cursor: pointer; }
+    button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .portal-card {
+      background-color: var(--bg-canvas);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px;
     }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
+    .portal-section-head {
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .portal-section-top {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+    .portal-row {
+      padding: 14px 0;
+      border-top: 1px solid var(--border);
+    }
+    .portal-row:first-child {
+      border-top: 0;
+    }
+    .portal-header {
+      background-color: var(--bg-canvas);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 0;
+    }
+    .portal-footer {
+      background-color: var(--bg-canvas);
+      border-top: 1px solid var(--border);
+      padding: 20px 16px;
+    }
+    .portal-error {
+      background-color: var(--bg-canvas);
+      border: 1px solid var(--st-red-border);
+      border-radius: 8px;
+      padding: 32px 24px;
+    }
+    .surface-subtle { background-color: var(--bg-subtle); }
+    .text-ink { color: var(--text-primary); }
+    .text-sub { color: var(--text-secondary); }
+    .text-muted { color: var(--text-muted); }
+    .text-st-green { color: var(--st-green-text); }
+    .tabular-nums { font-variant-numeric: tabular-nums; }
+    .ch-mark {
+      display: inline-flex; align-items: center; justify-content: center;
+      background-color: var(--accent); color: #ffffff; font-weight: 700;
+      border-radius: 6px; letter-spacing: -0.03em; flex-shrink: 0;
+    }
+    .status-sq { width: 8px; height: 8px; border-radius: 2px; display: inline-block; flex-shrink: 0; }
+    .st-neutral { background-color: var(--st-neutral-dot); }
+    .st-blue { background-color: var(--st-blue-dot); }
+    .st-amber { background-color: var(--st-amber-dot); }
+    .st-green { background-color: var(--st-green-dot); }
+    .badge-neutral { background-color: var(--st-neutral-bg); color: var(--st-neutral-text); border-color: var(--st-neutral-border); }
+    .badge-blue { background-color: var(--st-blue-bg); color: var(--st-blue-text); border-color: var(--st-blue-border); }
+    .badge-amber { background-color: var(--st-amber-bg); color: var(--st-amber-text); border-color: var(--st-amber-border); }
+    .badge-green { background-color: var(--st-green-bg); color: var(--st-green-text); border-color: var(--st-green-border); }
+    .badge-red { background-color: var(--st-red-bg); color: var(--st-red-text); border-color: var(--st-red-border); }
+    .btn-primary {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      background-color: var(--accent); color: #ffffff; border: 1px solid var(--accent);
+      border-radius: 6px; font-size: 12px; font-weight: 600; padding: 7px 14px;
+    }
+    .btn-primary:hover { background-color: var(--accent-hover); }
+    .btn-secondary {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      background-color: var(--bg-canvas); color: var(--text-primary);
+      border: 1px solid var(--border-strong); border-radius: 6px; font-size: 12px; font-weight: 500; padding: 6px 12px;
+    }
+    .btn-secondary:hover { background-color: var(--bg-subtle); }
+    .skeleton-bar { background-color: var(--skeleton-base); border-radius: 4px; animation: skeletonPulse 1.4s ease-in-out infinite; }
+    @keyframes skeletonPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+    @media (prefers-reduced-motion: reduce) {
+      .skeleton-bar { animation: none; }
+      *, *::before, *::after { transition-duration: 0.01ms !important; }
     }
   </style>
 </head>
-<body class="h-full text-slate-800 antialiased selection:bg-slate-900 selection:text-white">
+<body class="h-full antialiased">
   <div id="portal-app" v-cloak class="min-h-full flex flex-col justify-between">
-    
-    <!-- Top Branding Navbar -->
-    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
-      <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+    <!-- Top Bar -->
+    <header class="portal-header sticky top-0 z-30">
+      <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-3">
         <div class="flex items-center gap-3">
-          <div class="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-sm shadow">
-            CH
-          </div>
+          <span class="ch-mark w-7 h-7 text-xs" aria-hidden="true">CH</span>
           <div>
-            <span class="font-bold text-slate-900 text-base tracking-tight block leading-none">ClientHub Portal</span>
-            <span class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block mt-1">Live Project Tracking</span>
+            <span class="font-semibold text-ink text-sm block leading-none">ClientHub Portal</span>
+            <span class="text-[11px] text-muted block mt-1">Live Project Tracking</span>
           </div>
         </div>
 
-        <div v-if="project" class="flex items-center gap-2">
-          <span class="text-xs font-semibold px-3 py-1 rounded-full border" :class="getStatusBadgeClass(project.status)">
+        <div class="flex items-center gap-2.5">
+          <span v-if="project" class="text-xs font-semibold px-2.5 py-1 rounded-[4px] border" :class="getStatusBadgeClass(project.status)">
             {{ project.status }}
           </span>
+          <button
+            type="button"
+            @click="toggleTheme"
+            :aria-label="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
+            class="btn-secondary"
+          >
+            {{ theme === 'dark' ? 'Light' : 'Dark' }}
+          </button>
         </div>
       </div>
     </header>
 
-    <!-- Main Content Area -->
+    <!-- Main Content -->
     <main class="flex-1 py-8 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto w-full">
-      
-      <!-- Loading State -->
-      <div v-if="loading" class="py-24 text-center">
-        <div class="spinner w-10 h-10 mx-auto mb-4"></div>
-        <p class="text-sm font-semibold text-slate-600">Loading your project status...</p>
-        <p class="text-xs text-slate-400 mt-1">Retrieving tasks, deliverables, and progress timeline.</p>
+      <!-- Skeleton Loading -->
+      <div v-if="loading" class="space-y-6" aria-label="Loading portal details">
+        <div class="portal-card space-y-3">
+          <div class="skeleton-bar h-4 w-36"></div>
+          <div class="skeleton-bar h-7 w-72"></div>
+          <div class="skeleton-bar h-3 w-48"></div>
+        </div>
+        <div class="portal-card space-y-3">
+          <div class="skeleton-bar h-5 w-52"></div>
+          <div class="skeleton-bar h-12 w-full"></div>
+          <div class="skeleton-bar h-12 w-full"></div>
+        </div>
       </div>
 
       <!-- Error State -->
-      <div v-else-if="error" class="bg-white rounded-2xl border border-rose-200 p-8 sm:p-12 text-center shadow-sm max-w-lg mx-auto my-12">
-        <div class="w-14 h-14 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto mb-4">
-          <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-        </div>
-        <h2 class="text-xl font-bold text-slate-900">Portal Link Unavailable</h2>
-        <p class="text-sm text-slate-600 mt-2 leading-relaxed">{{ error }}</p>
-        <p class="text-xs text-slate-400 mt-4">Please contact your project manager or agency administrator for an updated link.</p>
+      <div v-else-if="error" class="portal-error text-center max-w-lg mx-auto my-8">
+        <h1 class="text-lg font-bold text-ink">Portal Link Unavailable</h1>
+        <p class="text-sm text-sub mt-2 leading-relaxed">{{ error }}</p>
+        <p class="text-xs text-muted mt-3">Please contact your project manager or agency administrator for an updated link.</p>
       </div>
 
       <!-- Loaded Portal Dashboard -->
-      <div v-else-if="data" class="space-y-8">
-        
-        <!-- Welcome & Project Hero Card -->
-        <div class="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-8 shadow-sm">
-          <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div v-else-if="data" class="space-y-6">
+        <!-- Project Hero Summary -->
+        <section class="portal-card">
+          <div class="flex flex-col md:flex-row md:items-start justify-between gap-5">
             <div>
-              <p class="text-xs font-bold uppercase tracking-wider text-slate-400">
-                Prepared for: <span class="text-slate-800">{{ project.client_name }}</span>
+              <p class="text-xs font-medium text-muted">
+                Prepared for <span class="text-ink font-semibold">{{ project.client_name }}</span>
                 <span v-if="project.client_company"> ({{ project.client_company }})</span>
               </p>
-              <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1 tracking-tight">{{ project.title }}</h1>
-              <p class="text-sm font-medium text-slate-500 mt-1">{{ project.service_name }}</p>
+              <h1 class="text-2xl font-bold text-ink mt-1.5 tracking-tight">{{ project.title }}</h1>
+              <p class="text-sm text-sub mt-1">{{ project.service_name }}</p>
             </div>
 
-            <!-- Overall Progress Badge -->
-            <div class="flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200/80 shrink-0">
-              <div class="text-right">
-                <span class="text-[10px] font-bold uppercase text-slate-400 tracking-wider block">Execution</span>
-                <span class="text-2xl font-black text-slate-900 tabular-nums">{{ progress.work_percent }}%</span>
-              </div>
-              <div class="w-12 h-12 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm tabular-nums">
-                {{ progress.completed_tasks }}/{{ progress.total_tasks }}
+            <div class="flex items-baseline gap-4 shrink-0 md:text-right">
+              <div>
+                <span class="text-xs text-muted block">Milestone Completion</span>
+                <span class="text-2xl font-bold text-ink tabular-nums">{{ progress.work_percent }}%</span>
+                <span class="text-xs text-sub ml-1.5 tabular-nums">({{ progress.completed_tasks }}/{{ progress.total_tasks }} tasks)</span>
               </div>
             </div>
           </div>
 
-          <!-- Description -->
-          <p v-if="project.description" class="mt-5 text-sm text-slate-600 leading-relaxed bg-slate-50/70 p-4 rounded-xl border border-slate-100 whitespace-pre-line">
+          <p v-if="project.description" class="portal-section-top text-sm text-sub leading-relaxed whitespace-pre-line">
             {{ project.description }}
           </p>
 
-          <!-- Timeline Dates Bar -->
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-6 pt-6 border-t border-slate-100 text-xs">
+          <dl class="grid grid-cols-2 sm:grid-cols-3 gap-4 portal-section-top text-xs">
             <div>
-              <span class="text-slate-400 font-semibold block uppercase text-[10px]">Start Date</span>
-              <span class="text-slate-800 font-bold mt-0.5 block">{{ formatDate(project.start_date) }}</span>
+              <dt class="text-muted font-medium">Start Date</dt>
+              <dd class="text-ink font-semibold mt-1 tabular-nums">{{ formatDate(project.start_date) }}</dd>
             </div>
             <div>
-              <span class="text-slate-400 font-semibold block uppercase text-[10px]">Target Completion</span>
-              <span class="text-slate-800 font-bold mt-0.5 block">{{ formatDate(project.end_date) }}</span>
+              <dt class="text-muted font-medium">Target Completion</dt>
+              <dd class="text-ink font-semibold mt-1 tabular-nums">{{ formatDate(project.end_date) }}</dd>
             </div>
             <div class="col-span-2 sm:col-span-1">
-              <span class="text-slate-400 font-semibold block uppercase text-[10px]">Payment Status</span>
-              <span class="text-emerald-700 font-bold mt-0.5 block tabular-nums">{{ billing.payment_percent }}% Settled</span>
+              <dt class="text-muted font-medium">Payment Status</dt>
+              <dd class="text-st-green font-semibold mt-1 tabular-nums">{{ billing.payment_percent }}% Settled</dd>
             </div>
-          </div>
-        </div>
+          </dl>
+        </section>
 
-        <!-- Section 1: Work Milestones & Tasks -->
-        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-          <div class="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <!-- Section 1: Work Milestones & Tasks (List View) -->
+        <section class="portal-card">
+          <div class="portal-section-head flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h2 class="text-lg font-bold text-slate-900">Work Milestones &amp; Deliverable Tasks</h2>
-              <p class="text-xs text-slate-500 mt-0.5">Real-time status of items being developed, tested, and delivered</p>
+              <h2 class="text-base font-semibold text-ink">Work Milestones &amp; Deliverable Tasks</h2>
+              <p class="text-xs text-muted mt-1">Current state of deliverables across planning, execution, and review</p>
             </div>
             <div class="flex flex-wrap items-center gap-2 text-xs">
-              <span class="font-semibold px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-200">
+              <span class="font-semibold px-2.5 py-1 rounded-[4px] border badge-green tabular-nums">
                 {{ progress.completed_tasks }}/{{ progress.total_tasks }} Done
               </span>
-              <span v-if="progress.in_progress_tasks > 0" class="font-semibold px-2.5 py-1 bg-amber-50 text-amber-700 rounded-lg border border-amber-200">
+              <span v-if="progress.in_progress_tasks > 0" class="font-semibold px-2.5 py-1 rounded-[4px] border badge-blue tabular-nums">
                 {{ progress.in_progress_tasks }} Active
               </span>
-              <span v-if="progress.review_tasks > 0" class="font-semibold px-2.5 py-1 bg-blue-50 text-blue-700 rounded-lg border border-blue-200">
+              <span v-if="progress.review_tasks > 0" class="font-semibold px-2.5 py-1 rounded-[4px] border badge-amber tabular-nums">
                 {{ progress.review_tasks }} Review
               </span>
             </div>
           </div>
 
-          <!-- Progress Bar -->
-          <div class="w-full bg-slate-100 h-2">
-            <div
-              class="h-full bg-indigo-600 transition-all duration-500"
-              :style="{ width: progress.work_percent + '%' }"
-            ></div>
+          <div class="w-full surface-subtle h-1.5 rounded-full overflow-hidden mt-4 mb-2">
+            <div class="h-full bg-[#2563eb] transition-all duration-300" :style="{ width: progress.work_percent + '%' }"></div>
           </div>
 
-          <!-- Tasks List -->
-          <div class="divide-y divide-slate-100">
-            <div v-if="!progress.tasks || progress.tasks.length === 0" class="p-12 text-center text-sm text-slate-400">
+          <div>
+            <div v-if="!progress.tasks || progress.tasks.length === 0" class="py-8 text-center text-xs text-muted">
               No milestone tasks published yet.
             </div>
             <div
               v-for="t in progress.tasks"
               :key="t.id"
-              class="p-5 flex items-start justify-between gap-4"
+              class="portal-row flex items-start justify-between gap-4"
             >
-              <div class="flex items-start gap-3.5 min-w-0">
-                <!-- Status Icon -->
-                <div
-                  :class="['w-6 h-6 mt-0.5 rounded-full flex items-center justify-center shrink-0', t.status === 'Completed' ? 'bg-emerald-100 text-emerald-600' : t.status === 'Review' ? 'bg-blue-100 text-blue-600' : t.status === 'In Progress' ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-400']"
-                >
-                  <svg v-if="t.status === 'Completed'" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
-                  <span v-else-if="t.status === 'Review'" class="w-2 h-2 rounded-full bg-blue-500"></span>
-                  <span v-else-if="t.status === 'In Progress'" class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-                  <span v-else class="w-2 h-2 rounded-full bg-slate-300"></span>
-                </div>
+              <div class="flex items-start gap-3 min-w-0">
+                <span
+                  class="status-sq mt-1.5"
+                  :class="t.status === 'Completed' ? 'st-green' : t.status === 'Review' ? 'st-amber' : t.status === 'In Progress' ? 'st-blue' : 'st-neutral'"
+                  aria-hidden="true"
+                ></span>
 
                 <div class="min-w-0">
                   <div class="flex items-center gap-2 flex-wrap">
-                    <span :class="['text-sm font-semibold', t.status === 'Completed' ? 'line-through text-slate-400' : 'text-slate-900']">
+                    <span :class="['text-sm font-semibold', t.status === 'Completed' ? 'line-through text-muted' : 'text-ink']">
                       {{ t.title }}
                     </span>
                     <span
-                      class="text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase"
-                      :class="t.status === 'Completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : t.status === 'Review' ? 'bg-blue-50 text-blue-700 border-blue-200' : t.status === 'In Progress' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-100 text-slate-600 border-slate-200'"
+                      class="text-[11px] font-medium px-2 py-0.5 rounded-[4px] border"
+                      :class="t.status === 'Completed' ? 'badge-green' : t.status === 'Review' ? 'badge-amber' : t.status === 'In Progress' ? 'badge-blue' : 'badge-neutral'"
                     >
                       {{ t.status }}
                     </span>
                   </div>
 
-                  <p v-if="t.description" class="text-xs text-slate-600 mt-1 leading-relaxed">{{ t.description }}</p>
-                  <p v-if="t.due_date" class="text-[11px] text-slate-400 mt-1.5">
+                  <p v-if="t.description" class="text-xs text-sub mt-1 leading-relaxed">{{ t.description }}</p>
+                  <p v-if="t.due_date" class="text-[11px] text-muted mt-1 tabular-nums">
                     Target: {{ formatDate(t.due_date) }}
                   </p>
                 </div>
               </div>
 
-              <span v-if="t.completed_at" class="text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg shrink-0 border border-emerald-100">
+              <span v-if="t.completed_at" class="text-[11px] font-medium px-2.5 py-1 rounded-[4px] border badge-green shrink-0 tabular-nums">
                 Done {{ formatDate(t.completed_at) }}
               </span>
             </div>
           </div>
-        </div>
+        </section>
 
         <!-- Section 2: Deliverables & Files Download -->
-        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-          <div class="p-6 border-b border-slate-100">
-            <h2 class="text-lg font-bold text-slate-900">Deliverables &amp; Project Files</h2>
-            <p class="text-xs text-slate-500 mt-0.5">Download design assets, documents, reports, and project outputs</p>
+        <section class="portal-card">
+          <div class="portal-section-head">
+            <h2 class="text-base font-semibold text-ink">Deliverables &amp; Project Files</h2>
+            <p class="text-xs text-muted mt-1">Download shared design assets, documents, reports, and deliverables</p>
           </div>
 
-          <div class="divide-y divide-slate-100">
-            <div v-if="!files || files.length === 0" class="p-10 text-center text-sm text-slate-400">
+          <div class="mt-2">
+            <div v-if="!files || files.length === 0" class="py-8 text-center text-xs text-muted">
               No files or deliverables attached yet.
             </div>
             <div
               v-for="f in files"
               :key="f.id"
-              class="p-4 sm:p-5 flex items-center justify-between hover:bg-slate-50 transition-colors gap-3"
+              class="portal-row flex items-center justify-between gap-3"
             >
               <div class="flex items-center gap-3 min-w-0">
-                <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 border border-slate-200">
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                </div>
+                <span class="status-sq st-blue" aria-hidden="true"></span>
                 <div class="min-w-0">
-                  <a :href="resolveFileUrl(f.file_url)" target="_blank" class="font-semibold text-slate-900 hover:underline text-sm truncate block">{{ f.original_name }}</a>
-                  <p class="text-xs text-slate-400 mt-0.5">{{ formatFileSize(f.file_size) }} &bull; Uploaded {{ formatDate(f.uploaded_at) }}</p>
+                  <a :href="resolveFileUrl(f.file_url)" target="_blank" rel="noopener" class="font-semibold text-ink hover:underline text-sm truncate block">{{ f.original_name }}</a>
+                  <p class="text-xs text-muted mt-0.5 tabular-nums">{{ formatFileSize(f.file_size) }} &bull; Uploaded {{ formatDate(f.uploaded_at) }}</p>
                 </div>
               </div>
 
-              <a
-                :href="resolveFileUrl(f.file_url)"
-                target="_blank"
-                download
-                class="px-4 py-2 text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-xl shadow-sm transition-colors flex items-center gap-1.5 shrink-0"
-              >
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+              <a :href="resolveFileUrl(f.file_url)" target="_blank" rel="noopener" download class="btn-primary shrink-0">
                 Download
               </a>
             </div>
           </div>
-        </div>
+        </section>
 
-        <!-- Section 3: Billing & Invoicing Summary -->
-        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 sm:p-8">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+        <!-- Section 3: Billing & Payment Summary -->
+        <section class="portal-card">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <div>
-              <h2 class="text-lg font-bold text-slate-900">Billing &amp; Payment Summary</h2>
-              <p class="text-xs text-slate-500 mt-0.5">Summary of contracted budget, payments received, and remaining balance</p>
+              <h2 class="text-base font-semibold text-ink">Billing &amp; Payment Summary</h2>
+              <p class="text-xs text-muted mt-1">Contracted budget, settled payments, and remaining balance</p>
             </div>
-            <span class="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 self-start sm:self-auto tabular-nums">
+            <span class="text-xs font-semibold px-2.5 py-1 rounded-[4px] border badge-green self-start sm:self-auto tabular-nums">
               {{ billing.payment_percent }}% Paid
             </span>
           </div>
 
-          <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden mb-6">
-            <div
-              class="h-full bg-emerald-500 transition-all duration-500"
-              :style="{ width: Math.min(100, billing.payment_percent || 0) + '%' }"
-            ></div>
+          <div class="w-full surface-subtle h-1.5 rounded-full overflow-hidden mb-5">
+            <div class="h-full bg-[#16a34a] transition-all duration-300" :style="{ width: Math.min(100, billing.payment_percent || 0) + '%' }"></div>
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
-            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200/80">
-              <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Total Contract Value</span>
-              <p class="text-xl font-bold text-slate-900 tabular-nums mt-1">{{ formatCurrency(billing.total_budget) }}</p>
+          <dl class="grid grid-cols-1 sm:grid-cols-3 gap-5 portal-section-top">
+            <div>
+              <dt class="text-xs font-medium text-muted">Total Contract Value</dt>
+              <dd class="text-xl font-bold text-ink tabular-nums mt-1">{{ formatCurrency(billing.total_budget) }}</dd>
             </div>
-            <div class="p-4 rounded-xl bg-emerald-50/75 border border-emerald-200/80">
-              <span class="text-[10px] uppercase font-bold text-emerald-700 tracking-wider">Amount Paid</span>
-              <p class="text-xl font-bold text-emerald-800 tabular-nums mt-1">{{ formatCurrency(billing.total_received) }}</p>
+            <div>
+              <dt class="text-xs font-medium text-muted">Amount Paid</dt>
+              <dd class="text-xl font-bold text-st-green tabular-nums mt-1">{{ formatCurrency(billing.total_received) }}</dd>
             </div>
-            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200/80">
-              <span class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Remaining Balance</span>
-              <p class="text-xl font-bold text-slate-900 tabular-nums mt-1">{{ formatCurrency(billing.remaining_balance) }}</p>
+            <div>
+              <dt class="text-xs font-medium text-muted">Remaining Balance</dt>
+              <dd class="text-xl font-bold text-ink tabular-nums mt-1">{{ formatCurrency(billing.remaining_balance) }}</dd>
             </div>
-          </div>
+          </dl>
 
-          <!-- Payments Recorded -->
-          <div v-if="billing.payments && billing.payments.length > 0" class="mt-6 pt-6 border-t border-slate-100">
-            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Receipts &amp; Transactions</h4>
-            <div class="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
+          <div v-if="billing.payments && billing.payments.length > 0" class="portal-section-top">
+            <h3 class="text-xs font-semibold text-sub mb-2">Receipts &amp; Transactions</h3>
+            <div>
               <div
                 v-for="(pay, idx) in billing.payments"
                 :key="idx"
-                class="p-3.5 bg-white flex items-center justify-between text-xs"
+                class="portal-row flex items-center justify-between text-xs gap-3"
               >
                 <div>
-                  <span class="font-bold text-slate-900 tabular-nums">{{ formatCurrency(pay.amount) }}</span>
-                  <span class="text-slate-500 ml-2">&bull; {{ pay.payment_method || 'Payment' }}</span>
+                  <span class="font-semibold text-ink tabular-nums">{{ formatCurrency(pay.amount) }}</span>
+                  <span class="text-muted ml-2">&bull; {{ pay.payment_method || 'Payment' }}</span>
                 </div>
-                <div class="flex items-center gap-3">
-                  <span class="text-slate-400">{{ formatDate(pay.payment_date) }}</span>
-                  <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold border" :class="getPaymentStatusBadgeClass(pay.status)">
+                <div class="flex items-center gap-3 shrink-0">
+                  <span class="text-muted tabular-nums">{{ formatDate(pay.payment_date) }}</span>
+                  <span class="px-2 py-0.5 rounded-[4px] text-[11px] font-semibold border" :class="getPaymentStatusBadgeClass(pay.status)">
                     {{ pay.status }}
                   </span>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-
+        </section>
       </div>
     </main>
 
     <!-- Footer -->
-    <footer class="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-400">
+    <footer class="portal-footer text-center text-xs text-muted">
       <div class="max-w-5xl mx-auto px-4">
-        Powered by <strong class="text-slate-700 font-semibold">ClientHub</strong> &bull; Secure Real-Time Client Portal
+        Powered by <strong class="text-ink font-semibold">ClientHub</strong> &bull; Client Progress Portal
       </div>
     </footer>
-
   </div>
 
   <!-- Vue Application Bootstrap -->
@@ -323,13 +451,20 @@
           project: null,
           progress: {},
           files: [],
-          billing: {}
+          billing: {},
+          theme: document.documentElement.classList.contains('dark') ? 'dark' : 'light'
         };
       },
       async mounted() {
         await this.loadPortalData();
       },
       methods: {
+        toggleTheme() {
+          const next = this.theme === 'dark' ? 'light' : 'dark';
+          this.theme = next;
+          document.documentElement.classList.toggle('dark', next === 'dark');
+          try { localStorage.setItem('clienthub_theme', next); } catch (e) {}
+        },
         async loadPortalData() {
           const urlParams = new URLSearchParams(window.location.search);
           const token = urlParams.get('token');
@@ -386,19 +521,19 @@
         },
         getStatusBadgeClass(status) {
           const s = (status || '').toLowerCase();
-          if (s === 'completed') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-          if (s === 'review') return 'bg-blue-50 text-blue-700 border-blue-200';
-          if (s === 'in progress') return 'bg-blue-50 text-blue-700 border-blue-200';
-          if (s === 'on hold') return 'bg-amber-50 text-amber-700 border-amber-200';
-          if (s === 'cancelled') return 'bg-rose-50 text-rose-700 border-rose-200';
-          return 'bg-slate-100 text-slate-700 border-slate-200';
+          if (s === 'completed') return 'badge-green';
+          if (s === 'review') return 'badge-amber';
+          if (s === 'in progress') return 'badge-blue';
+          if (s === 'on hold') return 'badge-amber';
+          if (s === 'cancelled') return 'badge-red';
+          return 'badge-neutral';
         },
         getPaymentStatusBadgeClass(status) {
           const s = (status || '').toLowerCase();
-          if (s === 'received') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-          if (s === 'pending') return 'bg-amber-50 text-amber-700 border-amber-200';
-          if (s === 'refunded') return 'bg-rose-50 text-rose-700 border-rose-200';
-          return 'bg-slate-100 text-slate-700 border-slate-200';
+          if (s === 'received') return 'badge-green';
+          if (s === 'pending') return 'badge-amber';
+          if (s === 'refunded') return 'badge-red';
+          return 'badge-neutral';
         }
       }
     }).mount('#portal-app');
