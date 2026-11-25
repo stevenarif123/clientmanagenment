@@ -1,0 +1,36 @@
+{
+  "name": "mcpclienthub",
+  "version": "1.0.0",
+  "description": "ClientHub MCP Server for AI Agents to manage projects, tasks, kanban, work logs, and client portals",
+  "main": "dist/server.js",
+  "type": "module",
+  "bin": {
+    "mcpclienthub": "./dist/server.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "start": "node dist/server.js"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "clienthub",
+    "antigravity",
+    "project-management",
+    "kanban",
+    "tasks"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.6.1",
+    "axios": "^1.7.9",
+    "dotenv": "^16.4.7",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "typescript": "^5.7.3"
+  }
+}

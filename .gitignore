@@ -12,6 +12,11 @@ uploads/*
 .superpowers/
 *.log
 
+# MCP Server & Node dependencies/secrets
+**/node_modules/
+**/.env
+mcp-server/dist/
+
 # OS generated files
 .DS_Store
 Thumbs.db

@@ -86,6 +86,13 @@ ClientManagement/
 │   ├── database.sqlite
 │   └── .htaccess
 │
+├── mcp-server/           # ClientHub MCP Server (TypeScript) & AI Agent Skill
+│   ├── src/              # MCP tool definitions, API client & server
+│   ├── skills/           # Bundled `clienthub-agent` skill & reference SOPs
+│   ├── .env.example
+│   ├── export-schemas.js
+│   └── README.md
+│
 └── setup/                # SQL Schemas
     ├── database-schema-sqlite.sql
     └── seed-data.sql
@@ -123,6 +130,13 @@ If starting with a fresh database, navigating to `http://localhost:8000` will au
 2. Verify that `data/.htaccess` exists to protect the SQLite database file from direct browser download.
 3. Ensure PHP 8.0+ is selected in your hosting control panel.
 4. Access `https://yourdomain.com` in your browser.
+
+## MCP Server & AI Agent Skill
+
+ClientHub includes an integrated Model Context Protocol (MCP) server and bundled agent playbook inside [`mcp-server/`](mcp-server/README.md) so AI coding agents can manage clients, projects, 4-stage Kanban tasks, structured work updates, project finances, and live client portals:
+
+- **MCP Server Setup & Tool Docs**: [`mcp-server/README.md`](mcp-server/README.md)
+- **Bundled Agent Skill (`clienthub-agent`)**: [`mcp-server/skills/clienthub-agent/SKILL.md`](mcp-server/skills/clienthub-agent/SKILL.md)
 
 ## License
 
